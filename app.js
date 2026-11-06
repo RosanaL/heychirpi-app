@@ -1,7 +1,9 @@
 // Chirpi on the phone: a few questions, then practice. Everything is saved on this phone only.
 
+import { CHEERS, DONE_LINE, levelUpLine, spokenFeedback, START_LINE } from "./lines.js";
 import { Practice } from "./practice.js";
 import { FEEDBACK_EVERY, levelOf } from "./swing.js";
+import { isVoicePlaying, playLine, prepareVoice, stopVoice, unlockVoice } from "./voice.js";
 
 const LEVELS = [
   { value: "beginner", icon: "🌱", label: "刚入门", sub: "还没打过完整的一场" },
@@ -37,7 +39,6 @@ const CAMERA_VIEWS = [
   },
 ];
 const QUESTION_STEPS = ["level", "experience", "goal", "handedness"];
-const CHEERS = ["好球！", "漂亮！", "继续保持！", "越来越顺了！", "这杆不错！", "节奏很好！", "加油！"];
 const MAX_CLIPS = 20; // each is several MB in memory
 const FEEDBACK_SECONDS = 12;
 const PROFILE_KEY = "chirpi.profile";
@@ -127,8 +128,16 @@ function pickChineseVoice() {
 
 // Cheers are skipped while Chirpi is already talking; tips cut in.
 function speak(text, { important = true } = {}) {
-  if (state.muted || !window.speechSynthesis || !text) return;
-  if (speechSynthesis.speaking && !important) return;
+  if (state.muted || !text) return;
+  const talking = isVoicePlaying() || (window.speechSynthesis && speechSynthesis.speaking);
+  if (talking && !important) return;
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (!playLine(text, () => speakWithSystemVoice(text))) speakWithSystemVoice(text);
+}
+
+// For a line with no recording yet, or if the browser won't play the recording.
+function speakWithSystemVoice(text) {
+  if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "zh-CN";
@@ -377,7 +386,7 @@ const screens = {
     const { swings, clips } = state.session;
     if (swings) {
       say(`今天挥了 ${swings} 杆，太棒了！`, `拿到 ${swings} 分。`, "celebrate");
-      speak(`今天挥了 ${swings} 杆，拿到 ${swings} 分，太棒了！`);
+      speak(DONE_LINE);
     } else {
       say("这次没有数到挥杆", "下次站到画面里，双脚和双手都要看得到。");
     }
@@ -396,7 +405,10 @@ const screens = {
 function toggleMute() {
   state.muted = !state.muted;
   writeLocal(MUTED_KEY, state.muted ? "1" : "0");
-  if (state.muted && window.speechSynthesis) speechSynthesis.cancel();
+  if (state.muted) {
+    stopVoice();
+    if (window.speechSynthesis) speechSynthesis.cancel();
+  }
   updatePracticeView();
 }
 
@@ -431,7 +443,7 @@ const practiceHandlers = {
   onSwing({ swing, levelUp }) {
     state.session.swings = swing;
     if (levelUp) {
-      const text = `升级啦！Chirpi 变成${levelUp}了！`;
+      const text = levelUpLine(levelUp);
       say(text, "继续加油！", "celebrate");
       speak(text);
     } else if (Date.now() < feedbackUntil) {
@@ -457,7 +469,7 @@ const practiceHandlers = {
   },
   onFeedback(text) {
     say(text, "", "talk");
-    speak(text);
+    speak(spokenFeedback(text));
     feedbackUntil = Date.now() + FEEDBACK_SECONDS * 1000;
   },
   onError: showPracticeError,
@@ -466,7 +478,8 @@ const practiceHandlers = {
 async function startPractice() {
   for (const clip of state.session.clips) URL.revokeObjectURL(clip.url);
   state.session = { swings: 0, clips: [], error: "" };
-  speak("开始啦", { important: true }); // iPhones only allow speech after a tap; this tap unlocks it
+  unlockVoice();
+  speak(START_LINE); // iPhones only allow speech after a tap; this tap unlocks the system voice too
   go("practice");
   practice = new Practice({
     video: view.video,
@@ -505,3 +518,4 @@ function render() {
 }
 
 render();
+prepareVoice();

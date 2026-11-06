@@ -11,6 +11,16 @@
 - `app.js`：页面。
 - `vendor/`：`@mediapipe/tasks-vision` 1.2.2（Apache-2.0）。`models/`：官方 pose_landmarker_lite，和 Python 版同一个模型。
 
+## 小鸟的声音
+
+小鸟说的每句话都在 `lines.js` 里，用 MiniMax 预先录好放在 `voice/`，运行时不调用任何接口，页面里也没有 key。
+某句没有录音时会用系统语音，所以改了台词要重新生成（只会录新增的句子）：
+
+```bash
+node tools/generate_voice.mjs --dry-run
+node tools/generate_voice.mjs    # 终端里要有 MINIMAX_API_KEY 和 MINIMAX_VOICE_ID
+```
+
 ## 本地运行
 
 摄像头要求 HTTPS 或 localhost。

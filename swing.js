@@ -453,6 +453,9 @@ const FAULT_TEXT = {
   unstable_finish: ["收杆不太稳", "收杆后站稳，保持一秒。"],
 };
 
+export const FAULT_CODES = Object.keys(FAULT_TEXT);
+export const LEVEL_NAMES = LEVELS.slice(1).map(([, name]) => name); // the levels you can reach
+
 export function levelOf(points) {
   let index = 0;
   LEVELS.forEach(([needed], candidate) => { if (points >= needed) index = candidate; });
