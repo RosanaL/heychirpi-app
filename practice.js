@@ -81,7 +81,6 @@ export class Practice {
     this.video.classList.toggle("mirror", this.facing === "user");
     this.canvas.classList.toggle("mirror", this.facing === "user");
     await this.video.play();
-    this.handlers.onCameraReady?.(this.video.videoWidth, this.video.videoHeight);
     this.clips = new ClipRecorder(this.stream);
     this.clips.begin();
   }
