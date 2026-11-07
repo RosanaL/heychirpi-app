@@ -77,6 +77,16 @@ export const DOWNSWING = "downswing";
 export const FOLLOW_THROUGH = "follow-through";
 export const WAITING_FOR_ADDRESS = "waiting for address";
 
+// A real swing has a shape in time. Anything outside these is the golfer moving around.
+const BACKSWING_MIN_SECONDS = 0.3; // shorter is the tracker jumping, not a backswing
+const BACKSWING_MAX_SECONDS = 2.5; // longer is hands held up, for example while bending to tee a ball
+const BACKSWING_MIN_RISE = 0.7; // torso lengths above address; less is a waggle
+const DOWNSWING_MAX_SECONDS = 1;
+const FOLLOW_THROUGH_RISE = 0.4; // torso lengths above the low point: the hands really came through
+const FOLLOW_THROUGH_MAX_SECONDS = 2.5; // golfers often walk off or fidget instead of holding a finish
+const HANDS_DOWN_LIFT = 0.4;
+const SWING_MIN_SECONDS = 1.2;
+
 class SwingTrigger {
   constructor() {
     this.reset();
@@ -96,6 +106,9 @@ class SwingTrigger {
     this.startTime = 0;
     this.peakLift = 0;
     this.downswingMinLift = 0;
+    this.downswingTime = 0;
+    this.followThroughTime = 0;
+    this.handsCameThrough = false;
     this.motionAnchor = null;
     this.lastMotionTime = 0;
     this.handsLoweredTime = null;
@@ -124,9 +137,20 @@ class SwingTrigger {
 
     if (this.state === BACKSWING) {
       this.peakLift = Math.max(this.peakLift, lift);
-      if (lift <= this.peakLift - 0.2) {
-        this.state = DOWNSWING;
-        this.downswingMinLift = lift;
+      if (timestamp - this.startTime > BACKSWING_MAX_SECONDS) {
+        this.reset();
+      } else if (lift <= this.peakLift - 0.2) {
+        const tooQuick = timestamp - this.startTime < BACKSWING_MIN_SECONDS;
+        const tooSmall = this.peakLift - this.addressLift < BACKSWING_MIN_RISE;
+        if (tooQuick || tooSmall) {
+          // A blip, so the golfer is still at address: keep the baseline,
+          // or the real backswing could start before it has rebuilt.
+          this.state = WAITING_FOR_BACKSWING;
+        } else {
+          this.state = DOWNSWING;
+          this.downswingMinLift = lift;
+          this.downswingTime = timestamp;
+        }
       }
       return null;
     }
@@ -137,8 +161,13 @@ class SwingTrigger {
       const meaningfulDownswing = this.peakLift - this.downswingMinLift >= 0.2;
       if (handReversed && meaningfulDownswing) {
         this.state = FOLLOW_THROUGH;
+        this.followThroughTime = timestamp;
+        this.handsCameThrough = false;
+        this.handsLoweredTime = null;
         this.motionAnchor = hand;
         this.lastMotionTime = timestamp;
+      } else if (timestamp - this.downswingTime > DOWNSWING_MAX_SECONDS) {
+        this.reset();
       }
       return null;
     }
@@ -150,23 +179,40 @@ class SwingTrigger {
         this.motionAnchor = hand;
         this.lastMotionTime = timestamp;
       }
+      if (lift >= this.downswingMinLift + FOLLOW_THROUGH_RISE) this.handsCameThrough = true;
+      if (lift >= HANDS_DOWN_LIFT) this.handsLoweredTime = null;
+      else if (this.handsLoweredTime === null) this.handsLoweredTime = timestamp;
       const settled = timestamp - this.lastMotionTime >= 0.8;
-      const longEnough = timestamp - this.startTime >= 1.2;
-      if (settled && longEnough) {
+      const timedOut = timestamp - this.followThroughTime >= FOLLOW_THROUGH_MAX_SECONDS;
+      const handsDown = this.handsCameThrough && this.handsLoweredTime !== null
+        && timestamp - this.handsLoweredTime >= 0.3;
+      const longEnough = timestamp - this.startTime >= SWING_MIN_SECONDS;
+      if ((settled || timedOut) && !this.handsCameThrough) {
+        this.reset(); // the hands never went through, so this was not a swing
+      } else if (longEnough && (settled || timedOut || handsDown)) {
         this.state = WAITING_FOR_ADDRESS;
-        this.handsLoweredTime = lift < 0.4 ? timestamp : null;
+        this.handsLoweredTime = lift < HANDS_DOWN_LIFT ? timestamp : null;
         return { startTime: this.startTime, endTime: timestamp };
       }
       return null;
     }
 
-    if (lift < 0.4) {
+    if (lift < HANDS_DOWN_LIFT) {
       if (this.handsLoweredTime === null) this.handsLoweredTime = timestamp;
       else if (timestamp - this.handsLoweredTime >= 0.4) this.reset();
     } else {
       this.handsLoweredTime = null;
     }
     return null;
+  }
+
+  // The golfer left the frame. A swing they had already finished still counts.
+  poseLost(timestamp) {
+    const finished = this.state === FOLLOW_THROUGH && this.handsCameThrough
+      && timestamp - this.startTime >= SWING_MIN_SECONDS;
+    const window = finished ? { startTime: this.startTime, endTime: timestamp } : null;
+    this.reset();
+    return window;
   }
 }
 
@@ -201,7 +247,10 @@ export class SwingPipeline {
     this.tracking = trackable(frame.kp);
     if (!this.tracking) {
       if (this.poseLostSince === null) this.poseLostSince = frame.t;
-      else if (frame.t - this.poseLostSince > POSE_LOST_RESET_SECONDS) this.trigger.reset();
+      else if (frame.t - this.poseLostSince > POSE_LOST_RESET_SECONDS) {
+        const lostWindow = this.trigger.poseLost(frame.t);
+        if (lostWindow) return this.recordingOf(lostWindow);
+      }
       return null;
     }
     this.poseLostSince = null;
@@ -216,8 +265,10 @@ export class SwingPipeline {
       torso: torsoHeight(frame.kp),
       timestamp: frame.t,
     });
-    if (window === null) return null;
+    return window === null ? null : this.recordingOf(window);
+  }
 
+  recordingOf(window) {
     const frames = this.buffer.filter((buffered) =>
       window.startTime - PRE_ROLL_SECONDS <= buffered.t && buffered.t <= window.endTime);
     return {

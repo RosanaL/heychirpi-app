@@ -217,6 +217,8 @@ function clipFigure(clip) {
   });
   // Each video starts a little before the swing; open it at the swing.
   video.addEventListener("loadedmetadata", () => { video.currentTime = clip.offset; });
+  // Playing again rewinds to the very start of the file, so go back to the swing instead.
+  video.addEventListener("play", () => { if (video.currentTime < clip.offset) video.currentTime = clip.offset; });
   const name = `chirpi-swing-${clip.swing}.${clip.blob.type.includes("mp4") ? "mp4" : "webm"}`;
   const file = new File([clip.blob], name, { type: clip.blob.type });
   const save = el("a", { href: clip.url, download: name, text: "保存" });

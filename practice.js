@@ -6,7 +6,7 @@ import {
   analyzeSwing, FEEDBACK_EVERY, guidance, setFeedback, SwingPipeline, WAITING_FOR_BACKSWING,
 } from "./swing.js";
 
-const MAX_IDLE_SEGMENT_SECONDS = 25; // start a fresh video while waiting, to bound memory
+const MAX_IDLE_SEGMENT_SECONDS = 8; // start a fresh video while waiting, so saved clips don't begin with a long wait
 const VIDEO_BITS_PER_SECOND = 2_000_000;
 const CLIP_TYPES = ["video/mp4", "video/webm;codecs=vp9", "video/webm"]; // mp4 is the one iPhones and seeking both like
 
@@ -25,6 +25,7 @@ class ClipRecorder {
     const recorder = new MediaRecorder(this.stream, { mimeType: this.type, videoBitsPerSecond: VIDEO_BITS_PER_SECOND });
     recorder.ondataavailable = (dataEvent) => { if (dataEvent.data.size) chunks.push(dataEvent.data); };
     recorder.chunks = chunks;
+    recorder.onstart = () => { if (this.recorder === recorder) this.startedAt = now(); }; // the video's real first frame
     recorder.start();
     this.recorder = recorder;
     this.startedAt = now();
