@@ -199,6 +199,17 @@ function levelCard() {
   ]);
 }
 
+// iPhones only offer "Save Video" (to Photos) through the share sheet; a plain download goes to Files.
+async function shareClip(file, link) {
+  try {
+    await navigator.share({ files: [file] });
+  } catch (problem) {
+    if (problem.name === "AbortError") return; // they closed the share sheet
+    link.onclick = null;
+    link.click();
+  }
+}
+
 function clipFigure(clip) {
   const video = el("video", {
     src: clip.url, controls: true, playsinline: true, muted: true, preload: "metadata",
@@ -206,14 +217,16 @@ function clipFigure(clip) {
   });
   // Each video starts a little before the swing; open it at the swing.
   video.addEventListener("loadedmetadata", () => { video.currentTime = clip.offset; });
-  const extension = clip.type.includes("mp4") ? "mp4" : "webm";
-  return el("figure", { class: "clip" }, [
-    video,
-    el("figcaption", {}, [
-      `第 ${clip.swing} 杆 `,
-      el("a", { href: clip.url, download: `chirpi-swing-${clip.swing}.${extension}`, text: "保存" }),
-    ]),
-  ]);
+  const name = `chirpi-swing-${clip.swing}.${clip.blob.type.includes("mp4") ? "mp4" : "webm"}`;
+  const file = new File([clip.blob], name, { type: clip.blob.type });
+  const save = el("a", { href: clip.url, download: name, text: "保存" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    save.onclick = (click) => {
+      click.preventDefault();
+      shareClip(file, save);
+    };
+  }
+  return el("figure", { class: "clip" }, [video, el("figcaption", {}, [`第 ${clip.swing} 杆 `, save])]);
 }
 
 function cameraError(problem) {
@@ -394,7 +407,7 @@ const screens = {
       levelCard(),
       clips.length ? el("p", { class: "section-title", text: "这次的挥杆" }) : null,
       clips.length ? el("div", { class: "clips" }, clips.map(clipFigure)) : null,
-      clips.length ? el("p", { class: "note", text: "视频只留到关闭页面，想留着就点“保存”。" }) : null,
+      clips.length ? el("p", { class: "note", text: "视频只留到关闭页面。想留着就点“保存”，再选“存储视频”，就会进相册。" }) : null,
       el("div", { class: "actions" }, [
         el("button", { class: "primary", type: "button", text: "回主页", onclick: () => go("home") }),
       ]),

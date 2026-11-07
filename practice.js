@@ -173,7 +173,7 @@ export class Practice {
     this.clips.cut().then((clip) => {
       if (!clip) return;
       const offset = Math.max(0, from - clip.startedAt);
-      this.handlers.onClip({ url: URL.createObjectURL(clip.blob), type: clip.blob.type, swing, offset, mirrored });
+      this.handlers.onClip({ url: URL.createObjectURL(clip.blob), blob: clip.blob, swing, offset, mirrored });
     });
 
     if (swing % FEEDBACK_EVERY === 0) {
