@@ -216,9 +216,20 @@ function speakRecorded(text) {
 function go(step) {
   state.step = step;
   render();
-  const field = panel.querySelector("textarea, .name-field");
-  if (field) field.focus({ preventScroll: true });
 }
+
+// The keyboard only opens when the golfer taps a field. Once it has slid up, if the field
+// (and the button right after it) ended up underneath, scroll them back into sight.
+document.addEventListener("focusin", (event) => {
+  const field = event.target;
+  if (!field.matches("input, textarea") || !window.visualViewport) return;
+  setTimeout(() => {
+    const view = window.visualViewport;
+    const group = field.closest(".ask, .chat-send") || field;
+    const hidden = group.getBoundingClientRect().bottom + 16 - (view.offsetTop + view.height);
+    if (hidden > 0) window.scrollBy({ top: hidden, behavior: "smooth" });
+  }, 350);
+});
 
 function optionList(items, selected, onPick) {
   return items.map((item) =>
