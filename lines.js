@@ -5,6 +5,7 @@ import { FAULT_CODES, FEEDBACK_EVERY, LEVEL_NAMES, setFeedback } from "./swing.j
 
 export const START_LINE = "开始啦！";
 export const DONE_LINE = "今天练得太棒了！";
+export const HATCH_LINE = "终于出来了！以后你每挥一杆，我都给你加油。";
 export const CHEERS = ["好球！", "漂亮！", "继续保持！", "越来越顺了！", "这杆不错！", "节奏很好！", "加油！"];
 
 export function levelUpLine(name) {
@@ -38,5 +39,5 @@ function feedbackLines() {
 }
 
 export function allLines() {
-  return [...new Set([START_LINE, DONE_LINE, ...CHEERS, ...LEVEL_NAMES.map(levelUpLine), ...feedbackLines()])];
+  return [...new Set([START_LINE, DONE_LINE, HATCH_LINE, ...CHEERS, ...LEVEL_NAMES.map(levelUpLine), ...feedbackLines()])];
 }

@@ -9,6 +9,7 @@
 - `pose.js`：摄像头和 MediaPipe 姿态模型。
 - `practice.js`：一次练球的循环和录像。
 - `app.js`：页面。
+- `onboarding.js`：第一次打开的流程：夜场里的一颗球，聊几句、挑帽子、按住孵出小鸟。
 - `vendor/`：`@mediapipe/tasks-vision` 1.2.2（Apache-2.0）。`models/`：官方 pose_landmarker_lite，和 Python 版同一个模型。
 
 ## 小鸟的声音

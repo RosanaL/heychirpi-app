@@ -1,6 +1,7 @@
 // Chirpi on the phone: a few questions, then practice. Everything is saved on this phone only.
 
-import { CHEERS, DONE_LINE, levelUpLine, spokenFeedback, START_LINE } from "./lines.js";
+import { CHEERS, DONE_LINE, HATCH_LINE, levelUpLine, spokenFeedback, START_LINE } from "./lines.js";
+import { applyCap, CAPS, createOnboarding } from "./onboarding.js";
 import { Practice } from "./practice.js";
 import { FEEDBACK_EVERY, levelOf } from "./swing.js";
 import { isVoicePlaying, playLine, prepareVoice, stopVoice, unlockVoice } from "./voice.js";
@@ -36,7 +37,54 @@ const CAMERA_VIEWS = [
     tips: ["放在你身后 3 米左右，对准目标线，别放在球飞的方向上", "这个角度只数杆和录像，不分析身体动作"],
   },
 ];
-const QUESTION_STEPS = ["level", "experience", "goal", "handedness"];
+// The first-visit chat: the same questions the profile screens edit later, each with its own comeback.
+const CHAT_QUESTIONS = [
+  {
+    key: "level",
+    ask: (name) => `${name}，你现在打得怎么样？`,
+    items: LEVELS,
+    replies: {
+      beginner: "刚入门最好玩，每一杆都是新纪录。",
+      high_handicap: "能下场就已经赢过好多人啦！",
+      mid_handicap: "哦？有两把刷子嘛。",
+      low_handicap: "高手！那我得抓紧长大了。",
+    },
+  },
+  {
+    key: "experience",
+    ask: "打球多久了？",
+    items: EXPERIENCE,
+    replies: {
+      under_6_months: "那我们正好一起从头长大。",
+      "6_months_to_2_years": "正是最上瘾的时候，我懂。",
+      "2_to_5_years": "这么久，球包里肯定有不少故事。",
+      over_5_years: "老将了，以后多罩着我。",
+    },
+  },
+  {
+    key: "goal",
+    ask: "现在最想达成什么？",
+    free: true,
+    ideas: GOAL_IDEAS,
+    placeholder: "或者用自己的话说说",
+    replies: {
+      打得更远: "远！我喜欢。那我也要飞得很远。",
+      打得更稳定: "稳稳的，那我就当一只靠谱的鸟。",
+      "第一次破 100": "好，这个数字我记住了。",
+      "破 90": "好，这个数字我记住了。",
+      改掉右曲球: "右曲球！我先替你骂它两句。",
+      享受打球就好: "这个目标最高级。",
+    },
+    otherReply: "记下了，这个目标我们一起盯着。",
+  },
+  {
+    key: "handedness",
+    ask: "最后一个：你是右手打还是左手打？",
+    items: HANDEDNESS,
+    replies: { right: "收到，这下我知道该盯哪只脚了。", left: "左手打！收到，我会盯对那只脚。" },
+  },
+];
+const ONBOARDING_SCENES = new Set(["intro", "name", "chat", "match", "cap", "hatch", "card"]);
 const MAX_CLIPS = 20; // each is several MB in memory
 const FEEDBACK_SECONDS = 12;
 const PROFILE_KEY = "chirpi.profile";
@@ -78,9 +126,10 @@ class Progress {
 
 const savedProfile = readJson(PROFILE_KEY);
 const state = {
-  profile: savedProfile || { level: null, experience: null, goal: "", handedness: "right", camera_view: "face_on" },
+  profile: { name: "", level: null, experience: null, goal: "", handedness: "right", camera_view: "face_on", cap: CAPS[0].value, ...savedProfile },
   step: savedProfile ? "home" : "intro",
   editing: false,
+  chatIndex: 0,
   progress: new Progress(readJson(PROGRESS_KEY)),
   muted: readLocal(MUTED_KEY) === "1",
   session: { swings: 0, clips: [], error: "" },
@@ -159,16 +208,16 @@ function speakWithSystemVoice(text) {
   speechSynthesis.speak(utterance);
 }
 
+// Only for lines that are recorded: a robot voice would spoil the moment, so otherwise stay quiet.
+function speakRecorded(text) {
+  if (!state.muted) playLine(text, () => {});
+}
+
 function go(step) {
   state.step = step;
   render();
-  const field = panel.querySelector("textarea");
+  const field = panel.querySelector("textarea, .name-field");
   if (field) field.focus({ preventScroll: true });
-}
-
-function nextQuestion(current) {
-  if (state.editing) return "summary";
-  return QUESTION_STEPS[QUESTION_STEPS.indexOf(current) + 1] || "summary";
 }
 
 function optionList(items, selected, onPick) {
@@ -263,27 +312,19 @@ function cameraError(problem) {
 }
 
 const screens = {
-  intro() {
-    say("嗨！我是 Chirpi", "你的高尔夫小教练。先认识一下你吧，只要四个问题。");
-    return [
-      el("p", { class: "note", text: "早期测试版。摄像头画面、视频和资料都只留在你的手机上，不会上传。" }),
-      el("div", { class: "actions" }, [el("button", { class: "primary", type: "button", text: "好呀，开始", onclick: () => go("level") })]),
-    ];
-  },
-
   level() {
     say("你现在打得怎么样？");
     return [
-      state.editing ? null : backButton("intro"),
-      ...optionList(LEVELS, state.profile.level, (value) => { state.profile.level = value; go(nextQuestion("level")); }),
+      backButton("summary"),
+      ...optionList(LEVELS, state.profile.level, (value) => { state.profile.level = value; go("summary"); }),
     ];
   },
 
   experience() {
     say("打球多久了？");
     return [
-      state.editing ? null : backButton("level"),
-      ...optionList(EXPERIENCE, state.profile.experience, (value) => { state.profile.experience = value; go(nextQuestion("experience")); }),
+      backButton("summary"),
+      ...optionList(EXPERIENCE, state.profile.experience, (value) => { state.profile.experience = value; go("summary"); }),
     ];
   },
 
@@ -299,7 +340,7 @@ const screens = {
     const next = el("button", {
       class: "fab", type: "button", "aria-label": "下一步",
       disabled: !state.profile.goal.trim(),
-      onclick: () => go(nextQuestion("goal")),
+      onclick: () => go("summary"),
     }, [icon("next")]);
     const chips = el("div", { class: "chips" }, GOAL_IDEAS.map((idea) =>
       el("button", {
@@ -308,14 +349,14 @@ const screens = {
         onclick: () => { state.profile.goal = idea; render(); },
       }),
     ));
-    return [state.editing ? null : backButton("experience"), chips, textarea, next];
+    return [backButton("summary"), chips, textarea, next];
   },
 
   handedness() {
     say("你是右手打还是左手打？", "分析动作时要分清哪只脚靠近目标。");
     return [
-      state.editing ? null : backButton("goal"),
-      ...optionList(HANDEDNESS, state.profile.handedness, (value) => { state.profile.handedness = value; go(nextQuestion("handedness")); }),
+      backButton("summary"),
+      ...optionList(HANDEDNESS, state.profile.handedness, (value) => { state.profile.handedness = value; go("summary"); }),
     ];
   },
 
@@ -323,10 +364,12 @@ const screens = {
     say("好嘞，我记住了！", "有不对的点一下就能改。");
     state.editing = true;
     const rows = [
+      ["名字", state.profile.name, "name"],
       ["水平", labelOf(LEVELS, state.profile.level), "level"],
       ["球龄", labelOf(EXPERIENCE, state.profile.experience), "experience"],
       ["目标", state.profile.goal, "goal"],
       ["打法", labelOf(HANDEDNESS, state.profile.handedness), "handedness"],
+      ["帽子", labelOf(CAPS, state.profile.cap), "cap"],
     ];
     return [
       el("dl", { class: "summary" }, rows.map(([name, value, step]) =>
@@ -345,7 +388,7 @@ const screens = {
   },
 
   home() {
-    say("今天想练点什么？", state.profile.goal ? `你的目标：${state.profile.goal}` : "");
+    say(state.profile.name ? `${state.profile.name}，今天想练点什么？` : "今天想练点什么？", state.profile.goal ? `你的目标：${state.profile.goal}` : "");
     return [
       levelCard(),
       el("p", { class: "note", text: "早期测试版，判断还在校准，建议仅供参考。哪里疼就先停下休息。" }),
@@ -539,14 +582,25 @@ async function stopPractice() {
   go("practice_summary");
 }
 
+const onboarding = createOnboarding({
+  el, icon, state, go, say,
+  setProgress: (fraction) => { progressFill.style.width = `${Math.round(fraction * 100)}%`; },
+  saveProfile, speakRecorded, unlockVoice,
+  questions: CHAT_QUESTIONS,
+  hatchLine: HATCH_LINE,
+});
+Object.assign(screens, onboarding.screens);
+
 function render() {
+  onboarding.cancel();
   if (state.step !== "practice") view = null;
   document.body.classList.toggle("practicing", state.step === "practice");
+  document.body.classList.toggle("onboarding", ONBOARDING_SCENES.has(state.step));
+  document.body.classList.toggle("revealing", state.step === "reveal");
+  progressBar.classList.toggle("hidden", state.step !== "chat");
   panel.replaceChildren(...screens[state.step]().filter(Boolean));
-  const index = QUESTION_STEPS.indexOf(state.step);
-  progressBar.classList.toggle("hidden", index < 0);
-  progressFill.style.width = `${((index + 1) / QUESTION_STEPS.length) * 100}%`;
 }
 
+applyCap(state.profile.cap);
 render();
 prepareVoice();

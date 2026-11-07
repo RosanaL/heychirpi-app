@@ -384,3 +384,191 @@ textarea:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
   .bird-body, .eye, .bird.hop .bird-body, .bird.hop .wing, .bird.cheer .bird-body, .bird.cheer .wing,
   .bird.celebrate .bird-body, .bird.celebrate .wing, .bird.talk .beak { animation: none; }
 }
+
+/* First visit: the ball on the tee, before it becomes the bird. */
+.onboarding .brand, .onboarding .stage { display: none; }
+.onboarding .app { padding-top: max(16px, env(safe-area-inset-top)); }
+.onboarding .panel { flex: 1; margin-top: 0; min-height: 0; }
+.onboarding .progress { order: -1; margin: 18px 56px 0; }
+.scene { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; min-height: 0; text-align: center; }
+
+.ball-wrap { width: min(52vw, 210px); transition: filter 0.8s, opacity 0.8s; filter: drop-shadow(0 0 30px rgba(255, 244, 205, 0.4)); }
+.ball-wrap.small { width: min(36vw, 138px); }
+.ball-wrap.dim { opacity: 0.45; filter: none; }
+.ball-wrap.glow { filter: drop-shadow(0 0 44px rgba(255, 203, 71, 0.75)); }
+.ball-wrap.wobble .ball-body { animation: ball-wobble 1.5s ease-in-out infinite; }
+.golf-ball { display: block; width: 100%; height: auto; overflow: visible; }
+.golf-ball .tee { fill: var(--gold); }
+.golf-ball .ball-body { transform-origin: 100px 180px; }
+.golf-ball .ball-shell { fill: #f8f7ef; }
+.golf-ball .ball-dents circle { fill: #d9ddd3; }
+.golf-ball .cap-top { fill: var(--cap); }
+.golf-ball .cap-brim { fill: var(--cap-brim); }
+.golf-ball .cap-dot { fill: var(--bird-belly); }
+.golf-ball .ball-cracks path {
+  fill: none;
+  stroke: var(--gold-deep);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: calc(1 - var(--hatch, 0));
+}
+@keyframes ball-wobble {
+  0%, 62%, 100% { transform: rotate(0); }
+  70% { transform: rotate(-6deg); }
+  78% { transform: rotate(5deg); }
+  86% { transform: rotate(-3deg); }
+  94% { transform: rotate(2deg); }
+}
+
+/* Story captions float low, like subtitles. */
+.caption {
+  margin: 0;
+  max-width: 320px;
+  padding: 9px 16px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.38);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.caption.in { animation: rise 0.35s ease-out; }
+.story { cursor: pointer; }
+.story-actions { width: 100%; }
+.story-hint { margin: 0; font-size: 13px; color: var(--muted); }
+[hidden] { display: none !important; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* One question at a time, high enough to stay above the keyboard. */
+.ask { display: flex; flex-direction: column; gap: 14px; padding-top: 72px; }
+.ask-title { margin: 0; font-size: 26px; font-weight: 700; line-height: 1.3; text-align: center; }
+.ask-sub { margin: -8px 0 0; color: var(--muted); font-size: 15px; }
+.name-field, .chat-field {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  color: var(--on-light);
+  background: var(--passive);
+  border: none;
+  border-radius: 999px;
+  padding: 14px 20px;
+}
+.name-field { text-align: center; font-size: 18px; }
+.name-field::placeholder, .chat-field::placeholder { color: #5d6b70; }
+.name-field:focus, .chat-field:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* The chat */
+.chat { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; margin-top: 12px; }
+.chat-log { flex: 1 1 0; min-height: 96px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.chat-log-inner { min-height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; padding-top: 8px; }
+.message { display: flex; align-items: flex-end; gap: 8px; animation: rise 0.25s ease-out; }
+.message.you { justify-content: flex-end; }
+.message-text { margin: 0; max-width: 76%; padding: 10px 14px; font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+.message.ball .message-text { background: var(--action); color: var(--on-light); border-radius: 18px 18px 18px 5px; }
+.message.you .message-text { background: #bfe3d2; color: var(--on-light); border-radius: 18px 18px 5px 18px; }
+.message-ball {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, #ffffff, #e4e6da 72%);
+  box-shadow: 0 0 14px rgba(255, 244, 205, 0.55);
+}
+.message-ball.spacer { visibility: hidden; }
+.typing .message-text { display: flex; gap: 5px; padding: 15px 16px; }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--on-light); animation: typing 1s infinite; }
+.typing i:nth-child(2) { animation-delay: 0.15s; }
+.typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
+.chat-answers { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.chat-answers .option { padding: 10px 16px; border-radius: 16px; animation: rise 0.25s ease-out; }
+.chat-answers .option strong { font-size: 16px; }
+.chat-answers .option .sub { font-size: 13px; }
+.chat-send { display: flex; gap: 8px; }
+.send { flex: none; width: 48px; height: 48px; border: none; border-radius: 50%; background: var(--gold); color: var(--on-light); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.send:disabled { opacity: 0.35; }
+
+/* What it will be */
+.match { padding-top: 56px; }
+.match-card { width: 100%; padding: 16px 18px; background: var(--surface); border: 1px solid var(--surface-line); border-radius: 22px; }
+.match-card p { margin: 6px 0 12px; color: var(--muted); font-size: 15px; }
+.match-label { display: block; color: var(--muted); font-size: 14px; }
+.match-name { display: block; font-size: 30px; line-height: 1.25; color: var(--gold); }
+.tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.tag { padding: 3px 11px; border-radius: 999px; background: var(--surface); border: 1px solid var(--surface-line); font-size: 13px; }
+
+/* Choosing a cap */
+.cap-row { display: flex; align-items: center; justify-content: center; gap: 18px; width: 100%; margin-top: 24px; }
+.arrow { flex: none; width: 44px; height: 44px; border: none; border-radius: 50%; background: var(--surface); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.cap-name { margin: 0; font-weight: 700; }
+.swatches { display: flex; gap: 14px; }
+.swatch { width: 34px; height: 34px; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 2px var(--sky); }
+.swatch[aria-pressed="true"] { border-color: #fff; }
+
+/* Hold to hatch: cracks and glow follow --hatch, from 0 to 1. */
+.hatch-ball {
+  --hatch: 0;
+  width: min(62vw, 250px);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 0 calc(24px + var(--hatch) * 70px) rgba(255, 203, 71, calc(0.3 + var(--hatch) * 0.7)));
+  transform: scale(calc(1 + var(--hatch) * 0.12));
+}
+.hatch-prompt { margin: 12px 0 0; font-size: 17px; font-weight: 600; transition: opacity 0.2s; }
+.hatch-prompt.held { opacity: 0.45; }
+.key { display: inline-block; margin-right: 4px; padding: 2px 13px; border-radius: 999px; background: var(--action); color: var(--on-light); font-weight: 700; }
+.flash { position: fixed; inset: 0; z-index: 5; background: #fffbe8; opacity: 0; pointer-events: none; }
+.flash.show { animation: flash-in 0.45s ease-in forwards; }
+@keyframes flash-in { to { opacity: 1; } }
+
+/* The bird appears */
+.revealing .brand { visibility: hidden; }
+.revealing .app { animation: flash-out 0.7s ease-out; }
+.revealing .stage { margin-top: 12vh; }
+.revealing .bird { width: min(62vw, 240px); }
+.revealing .bubble { font-size: 44px; font-weight: 800; color: var(--gold); }
+.revealing .panel { align-items: center; gap: 18px; }
+.revealing .caption { text-align: center; }
+@keyframes flash-out { from { filter: brightness(4); } to { filter: brightness(1); } }
+
+/* The card to keep or send */
+.card-scene { justify-content: flex-start; gap: 10px; padding-top: 4px; }
+.bird-card { width: min(100%, 300px); margin: 6px 0 8px; overflow: hidden; border-radius: 26px; background: #fffdf6; color: var(--on-light); transform: rotate(-2deg); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); animation: card-in 0.5s ease-out; text-align: left; }
+.bird-card-sky { display: flex; justify-content: center; padding: 18px 0 8px; background: linear-gradient(180deg, var(--sky), var(--turf)); }
+.bird-card-sky .bird { width: 44%; }
+.bird-card-body { padding: 12px 16px 16px; }
+.bird-card-name { font-size: 24px; }
+.bird-card-body p { margin: 2px 0 10px; font-size: 14px; line-height: 1.45; color: #3b474d; }
+.bird-card .tags { justify-content: flex-start; }
+.bird-card .tag { background: #eef1e8; border-color: transparent; }
+.share { border: 1px solid var(--surface-line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-weight: 600; padding: 9px 20px; cursor: pointer; }
+.card-scene .actions { width: 100%; margin-top: auto; }
+.card-scene .note:empty { display: none; }
+@keyframes card-in { from { opacity: 0; transform: translateY(24px) rotate(3deg); } to { opacity: 1; transform: rotate(-2deg); } }
+
+.arrow, .swatch, .send, .share, .hatch-ball { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.hatch-ball { touch-action: none; }
+
+@media (max-height: 620px) {
+  .ask { padding-top: 56px; }
+  .ball-wrap.small { width: 96px; }
+  .cap-row { margin-top: 4px; }
+  .match { padding-top: 48px; gap: 8px; }
+  .match .fab, .caps .fab { width: 56px; height: 56px; margin-top: 2px; }
+  .bird-card-sky .bird { width: 30%; }
+  .revealing .stage { margin-top: 0; }
+  .revealing .bird { width: 150px; }
+  .revealing .bubble { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ball-wrap.wobble .ball-body, .caption.in, .message, .chat-answers .option, .bird-card, .revealing .app { animation: none; }
+  .bird-card { transform: none; }
+}

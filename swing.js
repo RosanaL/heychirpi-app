@@ -487,7 +487,7 @@ export function analyzeSwing(recording) {
 
 export const FEEDBACK_EVERY = 5;
 const LEVELS = [
-  [0, "蛋"],
+  [0, "刚破壳"],
   [10, "雏鸟"],
   [30, "小鸟"],
   [60, "会飞了"],
