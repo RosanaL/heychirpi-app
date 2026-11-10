@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Talk to Chirpi</title>
+  <meta name="description" content="Chirpi is a golf practice companion. Talk to it in real time, in English or Chinese.">
+  <meta name="theme-color" content="#0a1118">
+  <link rel="icon" href="../icons/icon-192.png">
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body class="demo">
+  <main class="app">
+    <header class="brand">Chirpi</header>
+
+    <section class="stage">
+    <svg class="bird" id="bird" viewBox="0 0 220 200" role="img" aria-label="Chirpi 小鸟">
+      <ellipse class="shadow" cx="110" cy="188" rx="56" ry="7"/>
+      <g class="bird-body">
+        <g class="legs">
+          <path d="M92 160 v18 m-7 0 h14" />
+          <path d="M124 160 v18 m-7 0 h14" />
+        </g>
+        <path class="tail" d="M42 118 L14 104 L22 126 L10 140 L46 134Z"/>
+        <ellipse class="body" cx="110" cy="112" rx="70" ry="62"/>
+        <ellipse class="belly" cx="118" cy="132" rx="42" ry="34"/>
+        <path class="wing" d="M70 108 C 52 118, 54 148, 84 152 C 100 150, 104 128, 92 112 Z"/>
+        <path class="tuft" d="M104 52 C 98 34, 112 30, 112 44 C 116 30, 130 34, 120 52"/>
+        <g class="cap">
+          <path class="cap-top" d="M70 72 C 76 40, 146 38, 152 70 Z"/>
+          <path class="cap-brim" d="M140 66 C 162 62, 182 66, 186 74 C 170 76, 152 76, 138 74 Z"/>
+          <circle class="cap-dot" cx="111" cy="47" r="4"/>
+        </g>
+        <g class="eye">
+          <circle class="eye-ball" cx="138" cy="94" r="9"/>
+          <circle class="eye-shine" cx="141" cy="91" r="3"/>
+        </g>
+        <ellipse class="cheek" cx="146" cy="116" rx="10" ry="6"/>
+        <path class="beak" d="M168 98 L194 106 L168 116 Z"/>
+      </g>
+      <circle class="ball" cx="180" cy="178" r="10"/>
+      <g class="ball-dimples">
+        <circle cx="177" cy="175" r="1.4"/><circle cx="183" cy="176" r="1.4"/>
+        <circle cx="179" cy="181" r="1.4"/><circle cx="185" cy="181" r="1.4"/>
+      </g>
+    </svg>
+      <h1 class="bubble" id="headline"></h1>
+      <p class="demo-status" id="status" aria-live="polite"></p>
+    </section>
+
+    <section class="transcript" id="transcript" aria-live="polite" aria-label="Conversation"></section>
+
+    <section class="demo-actions">
+      <button class="demo-talk" id="talk" type="button"></button>
+      <p class="demo-note" id="note"></p>
+    </section>
+  </main>
+  <noscript>This demo needs JavaScript.</noscript>
+  <script src="../vendor/elevenlabs-client/elevenlabs-client-1.35.0.iife.js"></script>
+  <script type="module" src="demo.js"></script>
+</body>
+</html>
