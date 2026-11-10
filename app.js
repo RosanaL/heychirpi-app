@@ -165,6 +165,7 @@ const ICONS = {
   speaker: '<path d="M4 9.5v5h3.5L13 19V5L7.5 9.5H4z"/><path d="M16.5 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/>',
   muted: '<path d="M4 9.5v5h3.5L13 19V5L7.5 9.5H4z"/><path d="M17 9.5l4.5 5"/><path d="M21.5 9.5l-4.5 5"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/>',
+  stop: '<rect x="7" y="7" width="10" height="10" rx="2.5" fill="currentColor" stroke="none"/>',
   flip: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/>',
 };
 
@@ -254,16 +255,6 @@ function backButton(step) {
 }
 
 // The small level bar across the top of the camera.
-function levelStrip() {
-  const { points } = state.progress;
-  const { level, name, start, next } = levelOf(points);
-  const percent = next ? Math.round(((points - start) / (next - start)) * 100) : 100;
-  return [
-    el("span", { text: `Lv.${level} ${name}` }),
-    el("div", { class: "level-bar" }, [el("span", { style: `width: ${percent}%` })]),
-  ];
-}
-
 function labelOf(items, value) {
   return (items.find((item) => item.value === value) || {}).label || "";
 }
@@ -432,17 +423,22 @@ const screens = {
   practice() {
     say("准备好了就挥吧！", `每挥一杆加一分，每 ${FEEDBACK_EVERY} 杆我给你一个小建议。`);
     const stop = el("button", {
-      class: "finish", type: "button", text: "练完了",
+      class: "finish", type: "button",
       onclick: async () => { stop.disabled = true; await stopPractice(); },
-    });
+    }, [icon("stop"), "练完了"]);
     view = {
+      set: el("span", { class: "session-chip" }),
+      timer: el("span", { class: "session-chip", "aria-label": "练了多久" }),
+      levelName: el("span"),
+      levelHint: el("span"),
+      levelFill: el("span"),
+      setHint: el("p", { class: "set-hint" }),
       video: el("video", { class: "live", playsinline: true, muted: true, autoplay: true }),
       canvas: el("canvas", { class: "live overlay", "aria-hidden": "true" }),
       guidance: el("p", { class: "guidance", text: "小鸟正在热身…" }),
       score: el("span", { class: "score-value", text: "0" }),
       pop: el("span", { class: "pop", "aria-hidden": "true", text: "+1" }),
       dots: el("div", { class: "dots", "aria-label": "这一组的进度" }),
-      level: el("div", { class: "level-strip" }),
       error: el("p", { class: "note error", hidden: true }),
       mute: el("button", { class: "control", type: "button", onclick: toggleMute }),
       flip: el("button", {
@@ -461,16 +457,22 @@ const screens = {
     };
     view.wrap = el("div", { class: "live-wrap" }, [view.video, view.canvas, view.guidance]);
     updatePracticeView();
+    tickTimer();
     return [
       view.wrap,
-      view.level,
+      el("div", { class: "session-top" }, [view.set, view.timer]),
       el("div", { class: "practice-bottom" }, [
         view.error,
         el("div", { class: "hud" }, [
           el("div", { class: "score" }, [view.score, el("span", { class: "score-label", text: "杆" }), view.pop]),
           view.dots,
+          view.setHint,
         ]),
-        el("div", { class: "controls" }, [view.talk, view.mute, view.flip, stop]),
+        el("div", { class: "session-level" }, [
+          el("div", { class: "level-bar" }, [view.levelFill]),
+          el("p", { class: "level-line" }, [view.levelName, view.levelHint]),
+        ]),
+        el("div", { class: "controls" }, [stop, view.talk, view.mute, view.flip]),
       ]),
     ];
   },
@@ -513,8 +515,15 @@ function updatePracticeView() {
   view.dots.replaceChildren(...Array.from({ length: FEEDBACK_EVERY }, (_, index) =>
     el("span", { class: index < inSet ? "dot on" : "dot" }),
   ));
-  view.level.replaceChildren(...levelStrip());
+  const left = FEEDBACK_EVERY - (swings % FEEDBACK_EVERY);
+  view.set.textContent = `第 ${Math.floor(swings / FEEDBACK_EVERY) + 1} 组`;
+  view.setHint.textContent = `再 ${left} 杆，它给你这组的话。`;
+  const { level, name, start, next } = levelOf(state.progress.points);
+  view.levelName.textContent = `Lv.${level} ${name}`;
+  view.levelHint.textContent = next ? `再 ${next - state.progress.points} 杆升级` : "最高级了";
+  view.levelFill.style.width = `${next ? Math.round(((state.progress.points - start) / (next - start)) * 100) : 100}%`;
   view.mute.replaceChildren(icon(state.muted ? "muted" : "speaker"));
+  view.mute.classList.toggle("off", state.muted);
   view.mute.setAttribute("aria-label", state.muted ? "Chirpi 静音中，点一下打开" : "Chirpi 会说话，点一下静音");
   if (view.talk) {
     const { status } = state.talk;
@@ -523,6 +532,17 @@ function updatePracticeView() {
     view.talk.disabled = status === "thinking";
     view.talk.setAttribute("aria-label", status === "listening" ? "说完了" : "跟 Chirpi 说话");
   }
+}
+
+let timerId = 0;
+
+function tickTimer() {
+  clearTimeout(timerId);
+  if (!view) return;
+  const seconds = Math.floor((Date.now() - (state.session.startedAt || Date.now())) / 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  view.timer.textContent = `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
+  timerId = setTimeout(tickTimer, 1000);
 }
 
 // What Chirpi knows when it answers: the profile and this practice, never the video.
@@ -645,7 +665,7 @@ const practiceHandlers = {
 
 async function startPractice() {
   for (const clip of state.session.clips) URL.revokeObjectURL(clip.url);
-  state.session = { swings: 0, clips: [], error: "", lastFeedback: "" };
+  state.session = { swings: 0, clips: [], error: "", lastFeedback: "", startedAt: Date.now() };
   unlockVoice();
   speak(START_LINE); // iPhones only allow speech after a tap; this tap unlocks the system voice too
   go("practice");

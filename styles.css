@@ -238,71 +238,102 @@ textarea:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
 .level-bar { height: 7px; margin-top: 10px; background: var(--track); border-radius: 999px; overflow: hidden; }
 .level-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-deep)); border-radius: 999px; transition: width 0.4s; }
 
-/* Practice: the camera is the whole screen and everything floats on it. */
+/* Practice: the camera is the whole screen and everything floats on it.
+   Styled from the Chirpi design system (练球中): tokens below, values copied from design-system/tokens.css. */
+@font-face {
+  font-family: "Xiaolai SC";
+  src: url("fonts/xiaolai-sc-subset.woff2") format("woff2"); /* subset: 3,755 common hanzi + the app's own text; OFL, see fonts/OFL.txt */
+  font-display: swap;
+}
+:root {
+  --font-chirpi: "Xiaolai SC", "PingFang SC", "Hiragino Sans GB", -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --page-top: #0a1118;
+  --text-2: #c4d0ca;
+  --text-3: #abb9b3;
+  --char-1: #ffcb47;
+  --progress-a: #f0a93c;
+  --progress-b: #ffcb47;
+  --progress-c: #ffe79e;
+  --glyph-idle: #7e8a84;
+  --glyph-active: #ffffff;
+  --destructive: #d2584b;
+  --ds-surface: rgba(10, 17, 24, 0.42); /* design surface, darkened so it reads over a bright camera picture */
+  --ds-surface-line: rgba(255, 255, 255, 0.14);
+}
+.practicing { font-family: var(--font-chirpi); }
 .practicing .brand, .practicing .progress { display: none; }
 .practicing .app { padding: 0; }
 .live-wrap { position: fixed; inset: 0; background: #000; overflow: hidden; }
 .live { display: block; width: 100%; height: 100%; object-fit: cover; }
 .overlay { position: absolute; inset: 0; }
 .mirror { transform: scaleX(-1); }
+/* The night shell, faded over the camera: dark at the top for the chips, darker at the bottom for the count. */
 .live-wrap::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(10, 20, 32, 0.55) 0%, transparent 24%, transparent 58%, rgba(10, 20, 32, 0.82) 100%);
+  background: linear-gradient(180deg, rgba(10, 17, 24, 0.6) 0%, transparent 26%, transparent 48%, rgba(10, 17, 24, 0.88) 100%);
 }
 
-.level-strip {
+.session-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-surface-line);
+  color: var(--text-2);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.session-chip { font: 600 11px/1 var(--font-mono); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.session-top {
   position: fixed;
   z-index: 2;
-  top: max(10px, env(safe-area-inset-top));
-  left: 16px;
-  right: 16px;
+  top: max(12px, env(safe-area-inset-top));
+  left: 22px;
+  right: 22px;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 700;
+  justify-content: space-between;
 }
-.level-strip .level-bar { flex: 1; margin: 0; height: 5px; background: rgba(255, 255, 255, 0.28); }
 
 .practicing .stage {
   position: fixed;
   z-index: 2;
-  top: calc(max(10px, env(safe-area-inset-top)) + 26px);
-  left: 12px;
-  right: 16px;
+  top: calc(max(12px, env(safe-area-inset-top)) + 40px);
+  left: 14px;
+  right: 22px;
   margin: 0;
   flex-direction: row;
   align-items: center;
   gap: 8px;
 }
-.practicing .bird { width: 68px; flex: none; filter: none; }
+.practicing .bird { width: 72px; flex: none; filter: drop-shadow(0 0 22px rgba(255, 203, 71, 0.3)); }
 .practicing .bubble {
   position: relative;
   background: var(--action);
   color: var(--on-light);
-  border-radius: 20px 20px 20px 6px;
+  border-radius: 18px 18px 18px 6px;
   padding: 9px 14px;
   font-size: 15px;
-  font-weight: 600;
-  line-height: 1.35;
+  font-weight: 400;
+  line-height: 1.4;
   text-align: left;
 }
-.practicing .bubble small { font-size: 13px; color: #46545a; margin-top: 2px; }
+.practicing .bubble small { font-size: 12.5px; color: #46545a; margin-top: 2px; }
 
 .guidance[hidden] { display: none; }
 .guidance {
   position: absolute;
   z-index: 1;
-  left: 16px;
-  right: 16px;
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 168px);
+  left: 22px;
+  right: 22px;
+  top: 40%;
   margin: 0;
   color: #fff;
   font-size: 24px;
-  font-weight: 700;
   line-height: 1.25;
   text-align: center;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
@@ -311,66 +342,87 @@ textarea:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
 .practice-bottom {
   position: fixed;
   z-index: 2;
-  left: 16px;
-  right: 16px;
-  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 22px;
+  right: 22px;
+  bottom: max(26px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
 }
-/* Readable from where the golfer stands, a few metres from the phone. */
-.hud { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.score { position: relative; display: flex; align-items: baseline; gap: 8px; }
-.score-label { font-size: 14px; font-weight: 600; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
-.score-value { font-size: 68px; line-height: 1; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5); }
-.pop { position: absolute; right: -40px; top: 0; font-size: 24px; font-weight: 800; color: var(--gold); opacity: 0; pointer-events: none; }
+/* The count: big enough to read from where the golfer stands, a few metres from the phone. */
+.hud { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.score { position: relative; display: flex; align-items: baseline; }
+.score-value { font-size: 92px; line-height: 0.9; font-weight: 700; letter-spacing: -0.045em; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45); }
+.score-label { font-size: 17px; font-weight: 700; color: var(--text-3); margin-left: 7px; }
+.pop { position: absolute; right: -44px; top: -6px; font-size: 24px; font-weight: 700; color: var(--char-1); opacity: 0; pointer-events: none; }
 .pop.show { animation: pop 0.9s ease-out; }
 @keyframes pop {
   0% { opacity: 0; transform: translateY(8px) scale(0.6); }
   20% { opacity: 1; transform: translateY(0) scale(1.2); }
   100% { opacity: 0; transform: translateY(-24px) scale(1); }
 }
-.dots { display: flex; gap: 7px; padding-bottom: 8px; }
-.dot { width: 16px; height: 16px; border-radius: 50%; background: rgba(255, 255, 255, 0.28); }
-.dot.on { background: var(--gold); }
+.dots { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; background: rgba(255, 255, 255, 0.24); }
+.dot.on { background: var(--char-1); }
+.set-hint { margin: 10px 0 0; font-size: 12.5px; color: var(--text-3); }
+.score-label, .set-hint, .level-line { text-shadow: 0 1px 6px rgba(10, 17, 24, 0.8); }
 
-.controls { display: flex; align-items: center; gap: 4px; padding: 6px; background: var(--action); border-radius: 999px; }
-.control {
-  width: 48px;
-  height: 48px;
-  flex: none;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  color: var(--on-light);
+/* Level: the contrast goes into the fill, the track nearly disappears. */
+.session-level .level-bar { height: 8px; margin: 0; background: rgba(255, 255, 255, 0.14); }
+.session-level .level-bar span { background: linear-gradient(90deg, var(--progress-a), var(--progress-b) 55%, var(--progress-c)); }
+.level-line { display: flex; justify-content: space-between; margin: 7px 2px 0; font-size: 12.5px; color: var(--text-3); }
+.level-line span:first-child { color: var(--char-1); }
+
+/* End: coral words on a white pill. Round buttons: grey glyph at rest, white while active. */
+.controls { display: flex; align-items: center; gap: 12px; }
+.finish {
+  flex: 1;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-}
-.control:disabled { opacity: 0.4; }
-/* Talking to Chirpi: gold while it listens. */
-.control.talk.listening { background: var(--gold); animation: listening 1.2s ease-in-out infinite; }
-@keyframes listening {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 203, 71, 0.55); }
-  50% { box-shadow: 0 0 0 8px rgba(255, 203, 71, 0); }
-}
-@media (prefers-reduced-motion: reduce) { .control.talk.listening { animation: none; } }
-.finish {
-  flex: 1;
-  height: 48px;
-  margin-left: 4px;
+  gap: 8px;
   border: none;
   border-radius: 999px;
-  background: var(--stop);
-  color: #fff;
+  background: var(--action);
+  color: var(--destructive);
   font: inherit;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
 }
-.finish:disabled { opacity: 0.6; }
+.finish .icon-svg { width: 17px; height: 17px; }
+.finish:disabled { color: var(--glyph-idle); }
+.control {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-surface-line);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--glyph-active);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color 0.3s, background 0.2s;
+}
+.control .icon-svg { width: 22px; height: 22px; stroke-width: 1.9; }
+.control.off { color: var(--glyph-idle); }
+.control:disabled { color: var(--glyph-idle); }
+/* Talking to Chirpi: the mic turns into Chirpi's gold while it listens. */
+.control.talk.listening { background: var(--char-1); border-color: transparent; color: var(--page-top); animation: listening 1.2s ease-in-out infinite; }
+@keyframes listening {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 203, 71, 0.55); }
+  50% { box-shadow: 0 0 0 9px rgba(255, 203, 71, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .control.talk.listening { animation: none; } }
 .practice-bottom .note.error { background: var(--on-light); padding: 10px 14px; border-radius: 14px; }
+@media (max-height: 700px) {
+  .score-value { font-size: 72px; }
+  .practice-bottom { gap: 12px; }
+}
 
 /* The swings from this session */
 .section-title { margin: 8px 0 0; font-weight: 700; font-size: 17px; }
