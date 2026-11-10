@@ -6,6 +6,7 @@ import { Practice } from "./practice.js";
 import { FEEDBACK_EVERY, levelOf } from "./swing.js";
 import { askChirpi, audioUrl, canListen, listen, talkSettings } from "./talk.js";
 import { isVoicePlaying, playLine, prepareVoice, queueClip, stopVoice, unlockVoice } from "./voice.js";
+import { loadRealtime, realtimeAvailable, startRealtime } from "./realtime.js";
 
 const LEVELS = [
   { value: "beginner", label: "刚入门", sub: "还没打过完整的一场" },
@@ -37,6 +38,11 @@ const CAMERA_VIEWS = [
     sub: "在你身后对着目标方向，录下球的轨迹",
     tips: ["放在你身后 3 米左右，对准目标线，别放在球飞的方向上", "这个角度只数杆和录像，不分析身体动作"],
   },
+];
+// How Chirpi talks during practice. 实时对话 is offered only when its agent is set up.
+const VOICE_MODES = [
+  { value: "recorded", label: "录好的声音", sub: "每 5 杆说一句建议，不能对话" },
+  { value: "realtime", label: "实时对话", sub: "随时跟它聊，它知道你挥了几杆。每次最多 10 分钟，要用麦克风" },
 ];
 // The first-visit chat: the same questions the profile screens edit later, each with its own comeback.
 const CHAT_QUESTIONS = [
@@ -128,7 +134,7 @@ class Progress {
 
 const savedProfile = readJson(PROFILE_KEY);
 const state = {
-  profile: { name: "", level: null, experience: null, goal: "", handedness: "right", camera_view: "face_on", cap: CAPS[0].value, ...savedProfile },
+  profile: { name: "", level: null, experience: null, goal: "", handedness: "right", camera_view: "face_on", voice_mode: "recorded", cap: CAPS[0].value, ...savedProfile },
   step: savedProfile ? "home" : "intro",
   editing: false,
   chatIndex: 0,
@@ -136,6 +142,7 @@ const state = {
   muted: readLocal(MUTED_KEY) === "1",
   session: { swings: 0, clips: [], error: "", lastFeedback: "" },
   talk: { settings: talkSettings(), history: [], status: "idle" }, // idle | listening | thinking
+  live: { call: null, status: "off", micOpen: true }, // 实时对话: off | connecting | on
 };
 
 const bird = document.getElementById("bird");
@@ -195,6 +202,7 @@ function pickChineseVoice() {
 // Cheers are skipped while Chirpi is already talking; tips cut in.
 function speak(text, { important = true } = {}) {
   if (state.muted || !text || state.talk.status !== "idle") return; // never talk over the golfer
+  if (state.live.status !== "off") return; // in 实时对话 Chirpi speaks for itself
   const talking = isVoicePlaying() || (window.speechSynthesis && speechSynthesis.speaking);
   if (talking && !important) return;
   if (window.speechSynthesis) speechSynthesis.cancel();
@@ -413,6 +421,7 @@ const screens = {
       backButton("home"),
       ...optionList(CAMERA_VIEWS, state.profile.camera_view, (value) => { state.profile.camera_view = value; saveProfile(); render(); }),
       chosen ? el("ul", { class: "tips" }, [...chosen.tips, "练球时屏幕要一直亮着。如果手机自己锁屏了，把 设置 › 显示与亮度 › 自动锁定 调成“永不”。"].map((tip) => el("li", { text: tip }))) : null,
+      ...voiceChoice(),
       state.session.error ? el("p", { class: "note error", text: state.session.error }) : null,
       el("div", { class: "actions" }, [
         el("button", { class: "primary", type: "button", text: "就这样，开始", onclick: startPractice }),
@@ -421,7 +430,9 @@ const screens = {
   },
 
   practice() {
-    say("准备好了就挥吧！", `每挥一杆加一分，每 ${FEEDBACK_EVERY} 杆我给你一个小建议。`);
+    say("准备好了就挥吧！", realtimeChosen()
+      ? `每挥一杆加一分，想聊随时说，每 ${FEEDBACK_EVERY} 杆我给你一个小建议。`
+      : `每挥一杆加一分，每 ${FEEDBACK_EVERY} 杆我给你一个小建议。`);
     const stop = el("button", {
       class: "finish", type: "button",
       onclick: async () => { stop.disabled = true; await stopPractice(); },
@@ -453,7 +464,9 @@ const screens = {
           if (view) view.flip.disabled = false;
         },
       }, [icon("flip")]),
-      talk: state.talk.settings && canListen() ? el("button", { class: "control talk", type: "button", onclick: talkToChirpi }) : null,
+      talk: realtimeChosen()
+        ? el("button", { class: "control talk", type: "button", onclick: toggleLiveMic })
+        : state.talk.settings && canListen() ? el("button", { class: "control talk", type: "button", onclick: talkToChirpi }) : null,
     };
     view.wrap = el("div", { class: "live-wrap" }, [view.video, view.canvas, view.guidance]);
     updatePracticeView();
@@ -504,6 +517,7 @@ function toggleMute() {
     stopVoice();
     if (window.speechSynthesis) speechSynthesis.cancel();
   }
+  if (state.live.call) state.live.call.setMuted(state.muted);
   updatePracticeView();
 }
 
@@ -525,7 +539,15 @@ function updatePracticeView() {
   view.mute.replaceChildren(icon(state.muted ? "muted" : "speaker"));
   view.mute.classList.toggle("off", state.muted);
   view.mute.setAttribute("aria-label", state.muted ? "Chirpi 静音中，点一下打开" : "Chirpi 会说话，点一下静音");
-  if (view.talk) {
+  if (view.talk && realtimeChosen()) {
+    const { status, micOpen } = state.live;
+    view.talk.replaceChildren(icon("mic"));
+    view.talk.classList.toggle("listening", status === "on" && micOpen);
+    view.talk.classList.toggle("off", status === "on" && !micOpen);
+    view.talk.disabled = status !== "on";
+    view.talk.setAttribute("aria-label", status === "connecting" ? "实时对话连接中" : status === "off" ? "实时对话已结束"
+      : micOpen ? "Chirpi 在听，点一下关麦克风" : "麦克风关着，点一下打开");
+  } else if (view.talk) {
     const { status } = state.talk;
     view.talk.replaceChildren(icon("mic"));
     view.talk.classList.toggle("listening", status === "listening");
@@ -615,6 +637,87 @@ async function talkToChirpi() {
   setTalkStatus("idle");
 }
 
+// 实时对话 ----------------------------------------------------------------------------------
+
+function realtimeChosen() {
+  return realtimeAvailable() && state.profile.voice_mode === "realtime";
+}
+
+function voiceChoice() {
+  if (!realtimeAvailable()) return [];
+  if (realtimeChosen()) loadRealtime().catch(() => {}); // ready before the tap that starts
+  return [
+    el("p", { class: "section-title", text: "Chirpi 怎么陪你" }),
+    ...optionList(VOICE_MODES, state.profile.voice_mode, (value) => { state.profile.voice_mode = value; saveProfile(); render(); }),
+  ];
+}
+
+// What Chirpi knows when the call starts, in plain words; the camera adds swings and tips as they come.
+function liveContext() {
+  const context = talkContext();
+  const facts = [
+    context.name && `名字：${context.name}`,
+    context.level && `水平：${context.level}`,
+    context.experience && `球龄：${context.experience}`,
+    context.goal && `目标：${context.goal}`,
+    context.handedness && `习惯：${context.handedness}`,
+    context.bird && `Chirpi 是：${context.bird}`,
+    context.camera && `手机：${context.camera}`,
+  ].filter(Boolean);
+  const analysis = state.profile.camera_view === "face_on" ? "" : "这个角度只数杆和录像，没有动作建议。";
+  return `练球刚开始，还没有挥杆。球手资料：${facts.join("；")}。${analysis}`;
+}
+
+function setLive(next) {
+  state.live = { ...state.live, ...next };
+  updatePracticeView();
+}
+
+async function startLive() {
+  setLive({ call: null, status: "connecting", micOpen: true });
+  const name = state.profile.name;
+  try {
+    const call = await startRealtime({
+      firstMessage: `${name ? `${name}，` : ""}我在旁边看着呢！准备好了就挥，想聊随时说。`,
+      context: liveContext(),
+      onMessage: (who, text) => {
+        if (!view) return;
+        if (who === "golfer") { say(`“${text}”`, "", "talk"); return; }
+        say(text, "", "talk");
+        feedbackUntil = Date.now() + FEEDBACK_SECONDS * 1000; // keep its words up instead of the next cheer
+      },
+      onMode: (mode) => { if (mode === "speaking" && view) react("talk"); },
+      onEnd: () => liveEnded("实时对话到时间了", "接下来我用录好的声音陪你。"),
+    });
+    if (state.live.status !== "connecting") { await call.end(); return; } // practice ended meanwhile
+    if (state.muted) call.setMuted(true);
+    setLive({ call, status: "on" });
+  } catch (problem) {
+    console.error(problem);
+    if (state.live.status === "connecting") liveEnded("实时对话没连上", "这次先用录好的声音陪你。");
+  }
+}
+
+function liveEnded(text, sub) {
+  setLive({ call: null, status: "off" });
+  if (view) say(text, sub, "hop");
+}
+
+async function endLive() {
+  const { call } = state.live;
+  state.live = { call: null, status: "off", micOpen: true };
+  if (call) {
+    try { await call.end(); } catch (problem) { console.error(problem); }
+  }
+}
+
+function toggleLiveMic() {
+  const { call, micOpen } = state.live;
+  if (!call) return;
+  call.setMicMuted(micOpen);
+  setLive({ micOpen: !micOpen });
+}
+
 function showPracticeError(text) {
   if (!view) return;
   view.error.textContent = text;
@@ -629,6 +732,11 @@ const practiceHandlers = {
   },
   onSwing({ swing, levelUp }) {
     state.session.swings = swing;
+    const { call } = state.live;
+    if (call) {
+      call.tell(`球手挥了第 ${swing} 杆。`);
+      if (levelUp) call.ask(`球手刚升到「${levelUp}」这一级，开心地恭喜一句。`);
+    }
     if (levelUp) {
       const text = levelUpLine(levelUp);
       say(text, "继续加油！", "celebrate");
@@ -657,7 +765,9 @@ const practiceHandlers = {
   onFeedback(text) {
     state.session.lastFeedback = text;
     say(text, "", "talk");
-    if (state.talk.status === "idle") speak(spokenFeedback(text));
+    const { call } = state.live;
+    if (call) call.ask(`球手挥完了第 ${state.session.swings} 杆。这一组的建议：${text}。用你的话跟球手说。`);
+    else if (state.talk.status === "idle") speak(spokenFeedback(text));
     feedbackUntil = Date.now() + FEEDBACK_SECONDS * 1000;
   },
   onError: showPracticeError,
@@ -667,7 +777,8 @@ async function startPractice() {
   for (const clip of state.session.clips) URL.revokeObjectURL(clip.url);
   state.session = { swings: 0, clips: [], error: "", lastFeedback: "", startedAt: Date.now() };
   unlockVoice();
-  speak(START_LINE); // iPhones only allow speech after a tap; this tap unlocks the system voice too
+  if (realtimeChosen()) startLive(); // in the tap, so the phone lets the call use the mic and speaker
+  else speak(START_LINE); // iPhones only allow speech after a tap; this tap unlocks the system voice too
   go("practice");
   practice = new Practice({
     video: view.video,
@@ -684,6 +795,7 @@ async function startPractice() {
     console.error(problem);
     practice.closeCamera();
     practice = null;
+    await endLive();
     state.session.error = cameraError(problem);
     go("camera");
   }
@@ -691,6 +803,7 @@ async function startPractice() {
 
 async function stopPractice() {
   if (listening) listening.stop();
+  await endLive();
   if (practice) await practice.stop();
   practice = null;
   state.progress.save();
