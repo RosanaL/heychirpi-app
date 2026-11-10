@@ -1,10 +1,11 @@
 // Chirpi on the phone: a few questions, then practice. Everything is saved on this phone only.
 
 import { CHEERS, DONE_LINE, HATCH_LINE, levelUpLine, spokenFeedback, START_LINE } from "./lines.js";
-import { applyCap, CAPS, createOnboarding } from "./onboarding.js";
+import { applyCap, birdKind, CAPS, createOnboarding } from "./onboarding.js";
 import { Practice } from "./practice.js";
 import { FEEDBACK_EVERY, levelOf } from "./swing.js";
-import { isVoicePlaying, playLine, prepareVoice, stopVoice, unlockVoice } from "./voice.js";
+import { askChirpi, audioUrl, canListen, listen, talkSettings } from "./talk.js";
+import { isVoicePlaying, playLine, prepareVoice, queueClip, stopVoice, unlockVoice } from "./voice.js";
 
 const LEVELS = [
   { value: "beginner", label: "刚入门", sub: "还没打过完整的一场" },
@@ -90,6 +91,7 @@ const FEEDBACK_SECONDS = 12;
 const PROFILE_KEY = "chirpi.profile";
 const PROGRESS_KEY = "chirpi.progress";
 const MUTED_KEY = "chirpi.muted";
+const TALK_HISTORY = 12; // earlier turns sent with each new thing the golfer says
 
 function readLocal(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -132,7 +134,8 @@ const state = {
   chatIndex: 0,
   progress: new Progress(readJson(PROGRESS_KEY)),
   muted: readLocal(MUTED_KEY) === "1",
-  session: { swings: 0, clips: [], error: "" },
+  session: { swings: 0, clips: [], error: "", lastFeedback: "" },
+  talk: { settings: talkSettings(), history: [], status: "idle" }, // idle | listening | thinking
 };
 
 const bird = document.getElementById("bird");
@@ -161,6 +164,7 @@ const ICONS = {
   next: '<path d="M9 5l7 7-7 7"/>',
   speaker: '<path d="M4 9.5v5h3.5L13 19V5L7.5 9.5H4z"/><path d="M16.5 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/>',
   muted: '<path d="M4 9.5v5h3.5L13 19V5L7.5 9.5H4z"/><path d="M17 9.5l4.5 5"/><path d="M21.5 9.5l-4.5 5"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/>',
   flip: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/>',
 };
 
@@ -189,7 +193,7 @@ function pickChineseVoice() {
 
 // Cheers are skipped while Chirpi is already talking; tips cut in.
 function speak(text, { important = true } = {}) {
-  if (state.muted || !text) return;
+  if (state.muted || !text || state.talk.status !== "idle") return; // never talk over the golfer
   const talking = isVoicePlaying() || (window.speechSynthesis && speechSynthesis.speaking);
   if (talking && !important) return;
   if (window.speechSynthesis) speechSynthesis.cancel();
@@ -453,6 +457,7 @@ const screens = {
           if (view) view.flip.disabled = false;
         },
       }, [icon("flip")]),
+      talk: state.talk.settings && canListen() ? el("button", { class: "control talk", type: "button", onclick: talkToChirpi }) : null,
     };
     view.wrap = el("div", { class: "live-wrap" }, [view.video, view.canvas, view.guidance]);
     updatePracticeView();
@@ -465,7 +470,7 @@ const screens = {
           el("div", { class: "score" }, [view.score, el("span", { class: "score-label", text: "杆" }), view.pop]),
           view.dots,
         ]),
-        el("div", { class: "controls" }, [view.mute, view.flip, stop]),
+        el("div", { class: "controls" }, [view.talk, view.mute, view.flip, stop]),
       ]),
     ];
   },
@@ -511,6 +516,83 @@ function updatePracticeView() {
   view.level.replaceChildren(...levelStrip());
   view.mute.replaceChildren(icon(state.muted ? "muted" : "speaker"));
   view.mute.setAttribute("aria-label", state.muted ? "Chirpi 静音中，点一下打开" : "Chirpi 会说话，点一下静音");
+  if (view.talk) {
+    const { status } = state.talk;
+    view.talk.replaceChildren(icon("mic"));
+    view.talk.classList.toggle("listening", status === "listening");
+    view.talk.disabled = status === "thinking";
+    view.talk.setAttribute("aria-label", status === "listening" ? "说完了" : "跟 Chirpi 说话");
+  }
+}
+
+// What Chirpi knows when it answers: the profile and this practice, never the video.
+function talkContext() {
+  const { profile } = state;
+  const kind = profile.archetype ? birdKind(profile.archetype) : null;
+  return {
+    name: profile.name,
+    level: labelOf(LEVELS, profile.level),
+    experience: labelOf(EXPERIENCE, profile.experience),
+    goal: profile.goal,
+    handedness: labelOf(HANDEDNESS, profile.handedness),
+    bird: kind ? `${kind.name}（${kind.tags.join("、")}）` : "",
+    swings: state.session.swings,
+    camera: labelOf(CAMERA_VIEWS, profile.camera_view),
+    last_feedback: state.session.lastFeedback,
+  };
+}
+
+function setTalkStatus(status) {
+  state.talk.status = status;
+  updatePracticeView();
+}
+
+let listening = null;
+
+async function talkToChirpi() {
+  if (listening) { listening.stop(); return; }
+  if (state.talk.status !== "idle") return;
+  stopVoice();
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  feedbackUntil = Infinity; // swings meanwhile still count, but don't cover the conversation with cheers
+  say("我在听…", "说完停一下就好", "talk");
+  setTalkStatus("listening");
+  let text = "";
+  try {
+    listening = listen({ onHeard: (heard) => say(`“${heard}”`, "我在听…", "talk") });
+    text = await listening.done;
+  } catch (problem) {
+    say(problem.message, "", "hop");
+  }
+  listening = null;
+  if (!text) {
+    if (state.talk.status === "listening") say("没听到你说话", "再点一下麦克风试试。", "hop");
+    setTalkStatus("idle");
+    return;
+  }
+  setTalkStatus("thinking");
+  say(`“${text}”`, "Chirpi 在想…", "talk");
+  let reply = "";
+  try {
+    await askChirpi({
+      settings: state.talk.settings,
+      text,
+      history: state.talk.history,
+      context: talkContext(),
+      onLine: ({ text: line, audio }) => {
+        reply += line;
+        say(reply, "", "talk");
+        if (audio && !state.muted) queueClip(audioUrl(audio));
+      },
+    });
+  } catch (problem) {
+    say(reply || problem.message, reply ? problem.message : "", "hop");
+  }
+  if (reply) {
+    state.talk.history = [...state.talk.history, { role: "user", text }, { role: "assistant", text: reply }].slice(-TALK_HISTORY);
+  }
+  feedbackUntil = Date.now() + FEEDBACK_SECONDS * 1000; // let the reply stay up instead of the next cheer
+  setTalkStatus("idle");
 }
 
 function showPracticeError(text) {
@@ -553,8 +635,9 @@ const practiceHandlers = {
     else if (state.step === "practice_summary") render();
   },
   onFeedback(text) {
+    state.session.lastFeedback = text;
     say(text, "", "talk");
-    speak(spokenFeedback(text));
+    if (state.talk.status === "idle") speak(spokenFeedback(text));
     feedbackUntil = Date.now() + FEEDBACK_SECONDS * 1000;
   },
   onError: showPracticeError,
@@ -562,7 +645,7 @@ const practiceHandlers = {
 
 async function startPractice() {
   for (const clip of state.session.clips) URL.revokeObjectURL(clip.url);
-  state.session = { swings: 0, clips: [], error: "" };
+  state.session = { swings: 0, clips: [], error: "", lastFeedback: "" };
   unlockVoice();
   speak(START_LINE); // iPhones only allow speech after a tap; this tap unlocks the system voice too
   go("practice");
@@ -587,6 +670,7 @@ async function startPractice() {
 }
 
 async function stopPractice() {
+  if (listening) listening.stop();
   if (practice) await practice.stop();
   practice = null;
   state.progress.save();

@@ -39,13 +39,32 @@ export function isVoicePlaying() {
 }
 
 export function stopVoice() {
+  queue.length = 0;
   audio.pause();
+}
+
+// Chirpi's spoken replies arrive a sentence at a time; they play one after another.
+const queue = [];
+audio.addEventListener("ended", playNext);
+audio.addEventListener("error", playNext);
+
+function playNext() {
+  const next = queue.shift();
+  if (!next) return;
+  audio.src = next;
+  audio.play().catch((problem) => { if (problem.name !== "AbortError") playNext(); });
+}
+
+export function queueClip(url) {
+  queue.push(url);
+  if (!isVoicePlaying() && queue.length === 1) playNext();
 }
 
 // False if this line has no clip. onBlocked runs if the browser refuses to play it.
 export function playLine(text, onBlocked) {
   const url = clips.get(text);
   if (!url) return false;
+  queue.length = 0;
   audio.src = url;
   audio.play().catch((problem) => {
     if (problem.name !== "AbortError") onBlocked(); // AbortError: a newer line cut in

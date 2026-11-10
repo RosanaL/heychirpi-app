@@ -349,6 +349,13 @@ textarea:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
   cursor: pointer;
 }
 .control:disabled { opacity: 0.4; }
+/* Talking to Chirpi: gold while it listens. */
+.control.talk.listening { background: var(--gold); animation: listening 1.2s ease-in-out infinite; }
+@keyframes listening {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 203, 71, 0.55); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 203, 71, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .control.talk.listening { animation: none; } }
 .finish {
   flex: 1;
   height: 48px;

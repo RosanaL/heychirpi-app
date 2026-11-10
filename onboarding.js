@@ -37,7 +37,7 @@ export function kindKeyFor(goal) {
   return KIND_OF_GOAL[goal] || "buddy";
 }
 
-function birdKind(key) {
+export function birdKind(key) {
   return KINDS[key] || KINDS.buddy;
 }
 
