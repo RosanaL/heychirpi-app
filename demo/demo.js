@@ -6,7 +6,7 @@ import { AGENT_ID } from "./config.js";
 const TEXTS = {
   en: {
     headline: "Talk to Chirpi",
-    intro: "A little bird that keeps you company at the driving range. Pretend you just hit a set of balls and ask what it saw. English or Chinese both work.",
+    intro: "A little bird that keeps you company at the driving range. Pretend you just hit a set of balls and ask what it saw.",
     start: "Start talking",
     end: "End",
     connecting: "Connecting…",
@@ -42,11 +42,8 @@ const TEXTS = {
   },
 };
 
-// English unless the link says ?lang=zh or this visitor chose 中文 before.
+// English only for now; the Chinese text above stays for later.
 function initialLanguage() {
-  const asked = new URLSearchParams(location.search).get("lang");
-  if (asked in TEXTS) return asked;
-  try { const saved = localStorage.getItem("chirpi-demo-lang"); if (saved in TEXTS) return saved; } catch {}
   return "en";
 }
 

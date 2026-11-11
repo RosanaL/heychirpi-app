@@ -1,7 +1,8 @@
-// 实时对话 during practice: an ElevenLabs Agents call (listening, turn-taking, interruptions,
+// Real-time chat (实时对话) during practice: an ElevenLabs Agents call (listening, turn-taking, interruptions,
 // Claude for the words, the voice). The app keeps Chirpi up to date with context updates and
 // asks it to say each set's tip; no key is on the phone, only the public agent id.
 
+import { tr } from "./i18n.js";
 import { PRACTICE_AGENT_ID } from "./realtime-config.js";
 
 const CLIENT = new URL("./vendor/elevenlabs-client/elevenlabs-client-1.35.0.iife.js", import.meta.url).href;
@@ -12,7 +13,7 @@ export function realtimeAvailable() {
   return Boolean(PRACTICE_AGENT_ID);
 }
 
-// The client library is 1 MB, so it loads only once someone picks 实时对话, before the tap that starts.
+// The client library is 1 MB, so it loads only once someone picks real-time chat, before the tap that starts.
 export function loadRealtime() {
   if (window.ElevenLabsClient) return Promise.resolve();
   if (!loading) {
@@ -20,7 +21,7 @@ export function loadRealtime() {
       const script = document.createElement("script");
       script.src = CLIENT;
       script.onload = () => resolve();
-      script.onerror = () => { loading = null; reject(new Error("实时对话没加载出来，检查一下网络。")); };
+      script.onerror = () => { loading = null; reject(new Error(tr("实时对话没加载出来，检查一下网络。", "Real-time chat didn't load. Check your connection."))); };
       document.head.append(script);
     });
   }

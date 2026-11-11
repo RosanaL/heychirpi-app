@@ -1,17 +1,9 @@
-/* The demo page: the app's night shell and bird, styled from the Chirpi design system. */
-.demo { font-family: var(--font-chirpi); }
+/* The demo page: the app's shell and bird. */
 .demo .app { max-width: 480px; padding-left: 22px; padding-right: 22px; }
 .demo .stage { margin: 4vh 0 12px; gap: 10px; }
 .demo .bird { width: min(52vw, 200px); }
 .demo .bubble { margin: 6px 0 0; font-size: 28px; line-height: 1.22; font-weight: 700; }
-/* EN / 中文: English first, switchable before a chat starts. */
-.demo-brand { position: relative; }
-.demo-lang { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; padding: 3px; border-radius: 999px; background: var(--ds-surface); border: 1px solid var(--ds-surface-line); }
-.demo-lang button { min-width: 44px; height: 30px; padding: 0 10px; border: none; border-radius: 999px; background: transparent; color: var(--text-3); font: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: none; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-.demo-lang button[aria-pressed="true"] { background: var(--action); color: var(--on-light); }
-.demo-lang button:disabled { cursor: default; opacity: 0.5; }
-.demo-lang button:focus-visible { outline: 2px solid var(--char-1); outline-offset: 2px; }
-.demo-status { margin: 0; max-width: 340px; text-align: center; font-size: 14.5px; line-height: 1.5; color: var(--text-2); min-height: 3em; }
+.demo-status { text-shadow: 0 1px 10px rgba(6, 10, 16, 0.7); margin: 0; max-width: 340px; text-align: center; font-size: 14.5px; line-height: 1.5; color: var(--text-2); min-height: 3em; }
 
 /* While Chirpi talks its beak keeps moving. */
 .bird.speaking .beak { transform-origin: 168px 107px; animation: chatter 0.22s ease-in-out infinite; }

@@ -1,79 +1,99 @@
 // Chirpi on the phone: a few questions, then practice. Everything is saved on this phone only.
 
-import { CHEERS, DONE_LINE, HATCH_LINE, levelUpLine, spokenFeedback, START_LINE } from "./lines.js";
+import { CHEERS, HATCH_LINE, levelUpLine, spokenFeedback } from "./lines.js";
 import { applyCap, birdKind, CAPS, createOnboarding } from "./onboarding.js";
 import { Practice } from "./practice.js";
 import { FEEDBACK_EVERY, levelOf } from "./swing.js";
 import { askChirpi, audioUrl, canListen, listen, talkSettings } from "./talk.js";
-import { isVoicePlaying, playLine, prepareVoice, queueClip, stopVoice, unlockVoice } from "./voice.js";
+import { playLine, prepareVoice, queueClip, stopVoice, unlockVoice } from "./voice.js";
 import { loadRealtime, realtimeAvailable, startRealtime } from "./realtime.js";
+import { LANG, tr } from "./i18n.js";
 
 const LEVELS = [
-  { value: "beginner", label: "刚入门", sub: "还没打过完整的一场" },
-  { value: "high_handicap", label: "能下场", sub: "一场通常 100 杆以上" },
-  { value: "mid_handicap", label: "有点水平", sub: "一场 85 到 100 杆" },
-  { value: "low_handicap", label: "高手", sub: "一场 85 杆以内" },
+  { value: "beginner", label: tr("刚入门", "Just starting"), sub: tr("还没打过完整的一场", "Haven't played a full round yet") },
+  { value: "high_handicap", label: tr("能下场", "On the course"), sub: tr("一场通常 100 杆以上", "Usually 100+ a round") },
+  { value: "mid_handicap", label: tr("有点水平", "Getting good"), sub: tr("一场 85 到 100 杆", "85 to 100 a round") },
+  { value: "low_handicap", label: tr("高手", "Low handicap"), sub: tr("一场 85 杆以内", "Under 85 a round") },
 ];
 const EXPERIENCE = [
-  { value: "under_6_months", label: "不到半年" },
-  { value: "6_months_to_2_years", label: "半年到两年" },
-  { value: "2_to_5_years", label: "两到五年" },
-  { value: "over_5_years", label: "五年以上" },
+  { value: "under_6_months", label: tr("不到半年", "Under 6 months") },
+  { value: "6_months_to_2_years", label: tr("半年到两年", "6 months to 2 years") },
+  { value: "2_to_5_years", label: tr("两到五年", "2 to 5 years") },
+  { value: "over_5_years", label: tr("五年以上", "Over 5 years") },
 ];
-const GOAL_IDEAS = ["打得更远", "打得更稳定", "第一次破 100", "破 90", "改掉右曲球", "享受打球就好"];
+const GOAL_IDEAS = tr(
+  ["打得更远", "打得更稳定", "第一次破 100", "破 90", "改掉右曲球", "享受打球就好"],
+  ["Hit it farther", "Be more consistent", "Break 100", "Break 90", "Fix my slice", "Just enjoy the game"],
+);
 const HANDEDNESS = [
-  { value: "right", label: "右手打", sub: "左脚靠近目标" },
-  { value: "left", label: "左手打", sub: "右脚靠近目标" },
+  { value: "right", label: tr("右手打", "Right-handed"), sub: tr("左脚靠近目标", "Left foot nearer the target") },
+  { value: "left", label: tr("左手打", "Left-handed"), sub: tr("右脚靠近目标", "Right foot nearer the target") },
 ];
 const CAMERA_VIEWS = [
   {
     value: "face_on",
-    label: "放在侧面",
-    sub: "正对着你的胸口，看正面的挥杆动作",
-    tips: ["手机靠在球包上竖着放，离你 3 到 5 米", "全身都要入镜，脚和双手都能看到"],
+    label: tr("放在侧面", "To your side"),
+    sub: tr("正对着你的胸口，看正面的挥杆动作", "Facing your chest, to watch your swing from the front"),
+    tips: tr(
+      ["手机靠在球包上竖着放，离你 3 到 5 米", "全身都要入镜，脚和双手都能看到"],
+      ["Stand the phone upright against your bag, 3 to 5 meters away", "Get your whole body in frame, feet and hands included"],
+    ),
   },
   {
     value: "down_the_line",
-    label: "放在后面",
-    sub: "在你身后对着目标方向，录下球的轨迹",
-    tips: ["放在你身后 3 米左右，对准目标线，别放在球飞的方向上", "这个角度只数杆和录像，不分析身体动作"],
+    label: tr("放在后面", "Behind you"),
+    sub: tr("在你身后对着目标方向，录下球的轨迹", "Behind you facing the target, to record the ball flight"),
+    tips: tr(
+      ["放在你身后 3 米左右，对准目标线，别放在球飞的方向上", "这个角度只数杆和录像，不分析身体动作"],
+      ["About 3 meters behind you on the target line, never where the ball flies", "From here Chirpi counts and records swings but doesn't analyze your body"],
+    ),
   },
 ];
-// How Chirpi talks during practice. 实时对话 is offered only when its agent is set up.
+// How Chirpi talks during practice. Real-time chat is offered only when its agent is set up.
 const VOICE_MODES = [
-  { value: "recorded", label: "录好的声音", sub: "每 5 杆说一句建议，不能对话" },
-  { value: "realtime", label: "实时对话", sub: "随时跟它聊，它知道你挥了几杆。每次最多 10 分钟，要用麦克风" },
+  { value: "recorded", label: tr("录好的声音", "Recorded voice"), sub: tr("每 5 杆说一句建议，不能对话", "A tip every 5 swings, no conversation") },
+  { value: "realtime", label: tr("实时对话", "Real-time chat"), sub: tr("随时跟它聊，它知道你挥了几杆。每次最多 10 分钟，要用麦克风", "Talk any time; it knows how many swings you've hit. Up to 10 minutes, uses the mic") },
 ];
 // The first-visit chat: the same questions the profile screens edit later, each with its own comeback.
 const CHAT_QUESTIONS = [
   {
     key: "level",
-    ask: (name) => `${name}，你现在打得怎么样？`,
+    ask: (name) => tr(`${name}，你现在打得怎么样？`, `${name}, how's your golf these days?`),
     items: LEVELS,
-    replies: {
+    replies: tr({
       beginner: "刚入门最好玩，每一杆都是新纪录。",
       high_handicap: "能下场就已经赢过好多人啦！",
       mid_handicap: "哦？有两把刷子嘛。",
       low_handicap: "高手！那我得抓紧长大了。",
-    },
+    }, {
+      beginner: "The beginning is the best part. Every swing is a new record.",
+      high_handicap: "Getting out on the course already beats a lot of people!",
+      mid_handicap: "Oh? Somebody knows what they're doing.",
+      low_handicap: "A pro! I'd better grow up fast.",
+    }),
   },
   {
     key: "experience",
-    ask: "打球多久了？",
+    ask: tr("打球多久了？", "How long have you been playing?"),
     items: EXPERIENCE,
-    replies: {
+    replies: tr({
       under_6_months: "那我们正好一起从头长大。",
       "6_months_to_2_years": "正是最上瘾的时候，我懂。",
       "2_to_5_years": "这么久，球包里肯定有不少故事。",
       over_5_years: "老将了，以后多罩着我。",
-    },
+    }, {
+      under_6_months: "Then we get to grow up together from the start.",
+      "6_months_to_2_years": "That's when it gets addictive. I get it.",
+      "2_to_5_years": "That long? Your bag must be full of stories.",
+      over_5_years: "A veteran! Please look out for me.",
+    }),
   },
   {
     key: "goal",
-    ask: "现在最想达成什么？",
+    ask: tr("现在最想达成什么？", "What do you most want to achieve?"),
     free: true,
     ideas: GOAL_IDEAS,
-    placeholder: "或者用自己的话说说",
+    placeholder: tr("或者用自己的话说说", "Or say it in your own words"),
     replies: {
       打得更远: "远！我喜欢。那我也要飞得很远。",
       打得更稳定: "稳稳的，那我就当一只靠谱的鸟。",
@@ -81,14 +101,23 @@ const CHAT_QUESTIONS = [
       "破 90": "好，这个数字我记住了。",
       改掉右曲球: "右曲球！我先替你骂它两句。",
       享受打球就好: "这个目标最高级。",
+      "Hit it farther": "Far! I love it. Then I'll fly far too.",
+      "Be more consistent": "Steady it is. I'll be one reliable bird.",
+      "Break 100": "Got it. I'll remember that number.",
+      "Break 90": "Got it. I'll remember that number.",
+      "Fix my slice": "The slice! Let me boo it for you first.",
+      "Just enjoy the game": "The best goal there is.",
     },
-    otherReply: "记下了，这个目标我们一起盯着。",
+    otherReply: tr("记下了，这个目标我们一起盯着。", "Noted. We'll keep an eye on that goal together."),
   },
   {
     key: "handedness",
-    ask: "最后一个：你是右手打还是左手打？",
+    ask: tr("最后一个：你是右手打还是左手打？", "Last one: do you swing right-handed or left-handed?"),
     items: HANDEDNESS,
-    replies: { right: "收到，这下我知道该盯哪只脚了。", left: "左手打！收到，我会盯对那只脚。" },
+    replies: tr(
+      { right: "收到，这下我知道该盯哪只脚了。", left: "左手打！收到，我会盯对那只脚。" },
+      { right: "Got it, now I know which foot to watch.", left: "A lefty! Got it, I'll watch the right foot." },
+    ),
   },
 ];
 const ONBOARDING_SCENES = new Set(["intro", "name", "chat", "match", "cap", "hatch", "card"]);
@@ -119,11 +148,11 @@ class Progress {
   }
 
   addSwing() {
-    const before = levelOf(this.points).level;
+    const before = levelOf(this.points, LANG).level;
     this.swings += 1;
     this.points += 1;
     this.save();
-    const after = levelOf(this.points);
+    const after = levelOf(this.points, LANG);
     return after.level > before ? after.name : null;
   }
 
@@ -194,17 +223,18 @@ function say(text, sub, mood = "hop") {
   react(mood);
 }
 
-function pickChineseVoice() {
+const SPEECH_LANG = tr("zh-CN", "en-US");
+
+function pickSystemVoice() {
   const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
-  return voices.find((v) => v.lang === "zh-CN" && v.localService) || voices.find((v) => v.lang.startsWith("zh")) || null;
+  const family = SPEECH_LANG.slice(0, 2);
+  return voices.find((v) => v.lang === SPEECH_LANG && v.localService) || voices.find((v) => v.lang.startsWith(family)) || null;
 }
 
-// Cheers are skipped while Chirpi is already talking; tips cut in.
-function speak(text, { important = true } = {}) {
+// Chirpi only speaks the swing analysis (each set's tip); cheers, levels and the like are on screen only.
+function speak(text) {
   if (state.muted || !text || state.talk.status !== "idle") return; // never talk over the golfer
   if (state.live.status !== "off") return; // in 实时对话 Chirpi speaks for itself
-  const talking = isVoicePlaying() || (window.speechSynthesis && speechSynthesis.speaking);
-  if (talking && !important) return;
   if (window.speechSynthesis) speechSynthesis.cancel();
   if (!playLine(text, () => speakWithSystemVoice(text))) speakWithSystemVoice(text);
 }
@@ -214,16 +244,20 @@ function speakWithSystemVoice(text) {
   if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "zh-CN";
-  const chosen = pickChineseVoice();
+  utterance.lang = SPEECH_LANG;
+  const chosen = pickSystemVoice();
   if (chosen) utterance.voice = chosen;
   utterance.rate = 1.05;
   speechSynthesis.speak(utterance);
 }
 
-// Only for lines that are recorded: a robot voice would spoil the moment, so otherwise stay quiet.
-function speakRecorded(text) {
-  if (!state.muted) playLine(text, () => {});
+// iPhones only allow speech after a tap. A silent utterance in the tap that starts practice
+// unlocks the system voice for the tips that fall back to it.
+function unlockSystemVoice() {
+  if (!window.speechSynthesis) return;
+  const silent = new SpeechSynthesisUtterance(" ");
+  silent.volume = 0;
+  speechSynthesis.speak(silent);
 }
 
 function go(step) {
@@ -259,7 +293,7 @@ function optionList(items, selected, onPick) {
 }
 
 function backButton(step) {
-  return el("button", { class: "back", type: "button", "aria-label": "上一步", onclick: () => go(step) }, [icon("back")]);
+  return el("button", { class: "back", type: "button", "aria-label": tr("上一步", "Back"), onclick: () => go(step) }, [icon("back")]);
 }
 
 // The small level bar across the top of the camera.
@@ -273,13 +307,13 @@ function saveProfile() {
 
 function levelCard() {
   const { points } = state.progress;
-  const { level, name, start, next } = levelOf(points);
+  const { level, name, start, next } = levelOf(points, LANG);
   const percent = next ? Math.round(((points - start) / (next - start)) * 100) : 100;
-  const hint = next ? `再挥 ${next - points} 杆升级` : "已经是最高级啦";
+  const hint = next ? tr(`再挥 ${next - points} 杆升级`, `${next - points} swings to level up`) : tr("已经是最高级啦", "Top level reached");
   return el("div", { class: "level-card" }, [
     el("div", { class: "level-head" }, [
       el("strong", { text: `Lv.${level} ${name}` }),
-      el("span", { text: `${points} 分 · ${hint}` }),
+      el("span", { text: tr(`${points} 分 · ${hint}`, `${points} pts · ${hint}`) }),
     ]),
     el("div", { class: "level-bar" }, [el("span", { style: `width: ${percent}%` })]),
   ]);
@@ -307,27 +341,28 @@ function clipFigure(clip) {
   video.addEventListener("play", () => { if (video.currentTime < clip.offset) video.currentTime = clip.offset; });
   const name = `chirpi-swing-${clip.swing}.${clip.blob.type.includes("mp4") ? "mp4" : "webm"}`;
   const file = new File([clip.blob], name, { type: clip.blob.type });
-  const save = el("a", { href: clip.url, download: name, text: "保存" });
+  const save = el("a", { href: clip.url, download: name, text: tr("保存", "Save") });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     save.onclick = (click) => {
       click.preventDefault();
       shareClip(file, save);
     };
   }
-  return el("figure", { class: "clip" }, [video, el("figcaption", {}, [el("span", { text: `第 ${clip.swing} 杆` }), save])]);
+  return el("figure", { class: "clip" }, [video, el("figcaption", {}, [el("span", { text: tr(`第 ${clip.swing} 杆`, `Swing ${clip.swing}`) }), save])]);
 }
 
 function cameraError(problem) {
   if (problem && problem.name === "NotAllowedError") {
-    return "没有摄像头权限。在 iPhone 上：设置 › Safari › 摄像头 选“允许”，再回来重新开始。";
+    return tr("没有摄像头权限。在 iPhone 上：设置 › Safari › 摄像头 选“允许”，再回来重新开始。",
+      "No camera permission. On iPhone: Settings › Safari › Camera, choose Allow, then come back and start again.");
   }
-  if (problem && problem.name === "NotFoundError") return "这台设备上没有找到摄像头。";
-  return (problem && problem.message) || "摄像头打不开，换 Safari 试试。";
+  if (problem && problem.name === "NotFoundError") return tr("这台设备上没有找到摄像头。", "No camera found on this device.");
+  return (problem && problem.message) || tr("摄像头打不开，换 Safari 试试。", "The camera won't open. Try Safari.");
 }
 
 const screens = {
   level() {
-    say("你现在打得怎么样？");
+    say(tr("你现在打得怎么样？", "How's your golf these days?"));
     return [
       backButton("summary"),
       ...optionList(LEVELS, state.profile.level, (value) => { state.profile.level = value; go("summary"); }),
@@ -335,7 +370,7 @@ const screens = {
   },
 
   experience() {
-    say("打球多久了？");
+    say(tr("打球多久了？", "How long have you been playing?"));
     return [
       backButton("summary"),
       ...optionList(EXPERIENCE, state.profile.experience, (value) => { state.profile.experience = value; go("summary"); }),
@@ -343,16 +378,16 @@ const screens = {
   },
 
   goal() {
-    say("现在最想达成的目标是什么？", "选一个，或者用自己的话说说。");
+    say(tr("现在最想达成的目标是什么？", "What's your goal right now?"), tr("选一个，或者用自己的话说说。", "Pick one, or say it in your own words."));
     const textarea = el("textarea", {
       maxlength: "200",
-      placeholder: "比如：这个月想把一号木打直",
-      "aria-label": "你的目标",
+      placeholder: tr("比如：这个月想把一号木打直", "For example: hit my driver straight this month"),
+      "aria-label": tr("你的目标", "Your goal"),
       oninput: () => { state.profile.goal = textarea.value; next.disabled = !textarea.value.trim(); },
     });
     textarea.value = state.profile.goal;
     const next = el("button", {
-      class: "fab", type: "button", "aria-label": "下一步",
+      class: "fab", type: "button", "aria-label": tr("下一步", "Next"),
       disabled: !state.profile.goal.trim(),
       onclick: () => go("summary"),
     }, [icon("next")]);
@@ -367,7 +402,7 @@ const screens = {
   },
 
   handedness() {
-    say("你是右手打还是左手打？", "分析动作时要分清哪只脚靠近目标。");
+    say(tr("你是右手打还是左手打？", "Right-handed or left-handed?"), tr("分析动作时要分清哪只脚靠近目标。", "I need to know which foot is nearer the target."));
     return [
       backButton("summary"),
       ...optionList(HANDEDNESS, state.profile.handedness, (value) => { state.profile.handedness = value; go("summary"); }),
@@ -375,26 +410,26 @@ const screens = {
   },
 
   summary() {
-    say("好嘞，我记住了！", "有不对的点一下就能改。");
+    say(tr("好嘞，我记住了！", "Got it, I'll remember!"), tr("有不对的点一下就能改。", "Tap anything that's wrong to change it."));
     state.editing = true;
     const rows = [
-      ["名字", state.profile.name, "name"],
-      ["水平", labelOf(LEVELS, state.profile.level), "level"],
-      ["球龄", labelOf(EXPERIENCE, state.profile.experience), "experience"],
-      ["目标", state.profile.goal, "goal"],
-      ["打法", labelOf(HANDEDNESS, state.profile.handedness), "handedness"],
-      ["帽子", labelOf(CAPS, state.profile.cap), "cap"],
+      [tr("名字", "Name"), state.profile.name, "name"],
+      [tr("水平", "Level"), labelOf(LEVELS, state.profile.level), "level"],
+      [tr("球龄", "Playing for"), labelOf(EXPERIENCE, state.profile.experience), "experience"],
+      [tr("目标", "Goal"), state.profile.goal, "goal"],
+      [tr("打法", "Swings"), labelOf(HANDEDNESS, state.profile.handedness), "handedness"],
+      [tr("帽子", "Cap"), labelOf(CAPS, state.profile.cap), "cap"],
     ];
     return [
       el("dl", { class: "summary" }, rows.map(([name, value, step]) =>
         el("div", {}, [
           el("dt", { text: name }),
-          el("dd", {}, [value, " ", el("button", { class: "link", type: "button", text: "改", "aria-label": `修改${name}`, onclick: () => go(step) })]),
+          el("dd", {}, [value, " ", el("button", { class: "link", type: "button", text: tr("改", "Edit"), "aria-label": tr(`修改${name}`, `Edit ${name}`), onclick: () => go(step) })]),
         ]),
       )),
       el("div", { class: "actions" }, [
         el("button", {
-          class: "primary", type: "button", text: "保存",
+          class: "primary", type: "button", text: tr("保存", "Save"),
           onclick: () => { saveProfile(); state.editing = false; go("home"); },
         }),
       ]),
@@ -402,58 +437,61 @@ const screens = {
   },
 
   home() {
-    say(state.profile.name ? `${state.profile.name}，今天想练点什么？` : "今天想练点什么？", state.profile.goal ? `你的目标：${state.profile.goal}` : "");
+    say(
+      state.profile.name ? tr(`${state.profile.name}，今天想练点什么？`, `${state.profile.name}, what are we working on today?`) : tr("今天想练点什么？", "What are we working on today?"),
+      state.profile.goal ? tr(`你的目标：${state.profile.goal}`, `Your goal: ${state.profile.goal}`) : "",
+    );
     return [
       levelCard(),
-      el("p", { class: "note", text: "早期测试版，判断还在校准，建议仅供参考。哪里疼就先停下休息。" }),
-      el("p", { class: "note", text: "想像 App 一样打开：在 Safari 点分享按钮，选“添加到主屏幕”。" }),
+      el("p", { class: "note", text: tr("早期测试版，判断还在校准，建议仅供参考。哪里疼就先停下休息。", "Early beta: the swing checks are still being tuned, so treat tips as suggestions. If anything hurts, stop and rest.") }),
+      el("p", { class: "note", text: tr("想像 App 一样打开：在 Safari 点分享按钮，选“添加到主屏幕”。", "To open it like an app: in Safari, tap Share, then Add to Home Screen.") }),
       el("div", { class: "actions" }, [
-        el("button", { class: "primary", type: "button", text: "开始一次练球", onclick: () => go("camera") }),
+        el("button", { class: "primary", type: "button", text: tr("开始一次练球", "Start practice"), onclick: () => go("camera") }),
       ]),
-      el("button", { class: "link quiet-link", type: "button", text: "修改我的资料", onclick: () => { state.editing = true; go("summary"); } }),
+      el("button", { class: "link quiet-link", type: "button", text: tr("修改我的资料", "Edit my profile"), onclick: () => { state.editing = true; go("summary"); } }),
     ];
   },
 
   camera() {
-    say("手机放哪儿？", "两种都可以，看你今天想练什么。");
+    say(tr("手机放哪儿？", "Where's your phone going?"), tr("两种都可以，看你今天想练什么。", "Either works, depending on what you're practicing today."));
     const chosen = CAMERA_VIEWS.find((item) => item.value === state.profile.camera_view);
     return [
       backButton("home"),
       ...optionList(CAMERA_VIEWS, state.profile.camera_view, (value) => { state.profile.camera_view = value; saveProfile(); render(); }),
-      chosen ? el("ul", { class: "tips" }, [...chosen.tips, "练球时屏幕要一直亮着。如果手机自己锁屏了，把 设置 › 显示与亮度 › 自动锁定 调成“永不”。"].map((tip) => el("li", { text: tip }))) : null,
+      chosen ? el("ul", { class: "tips" }, [...chosen.tips, tr("练球时屏幕要一直亮着。如果手机自己锁屏了，把 设置 › 显示与亮度 › 自动锁定 调成“永不”。", "Keep the screen on while you practice. If the phone locks itself, set Settings › Display & Brightness › Auto-Lock to Never.")].map((tip) => el("li", { text: tip }))) : null,
       ...voiceChoice(),
       state.session.error ? el("p", { class: "note error", text: state.session.error }) : null,
       el("div", { class: "actions" }, [
-        el("button", { class: "primary", type: "button", text: "就这样，开始", onclick: startPractice }),
+        el("button", { class: "primary", type: "button", text: tr("就这样，开始", "Let's go"), onclick: startPractice }),
       ]),
     ];
   },
 
   practice() {
-    say("准备好了就挥吧！", realtimeChosen()
-      ? `每挥一杆加一分，想聊随时说，每 ${FEEDBACK_EVERY} 杆我给你一个小建议。`
-      : `每挥一杆加一分，每 ${FEEDBACK_EVERY} 杆我给你一个小建议。`);
+    say(tr("准备好了就挥吧！", "Swing when you're ready!"), realtimeChosen()
+      ? tr(`每挥一杆加一分，想聊随时说，每 ${FEEDBACK_EVERY} 杆我给你一个小建议。`, `One point per swing. Talk to me any time, and every ${FEEDBACK_EVERY} swings I'll give you a tip.`)
+      : tr(`每挥一杆加一分，每 ${FEEDBACK_EVERY} 杆我给你一个小建议。`, `One point per swing, and every ${FEEDBACK_EVERY} swings I'll give you a tip.`));
     const stop = el("button", {
       class: "finish", type: "button",
       onclick: async () => { stop.disabled = true; await stopPractice(); },
-    }, [icon("stop"), "练完了"]);
+    }, [icon("stop"), tr("练完了", "Done")]);
     view = {
       set: el("span", { class: "session-chip" }),
-      timer: el("span", { class: "session-chip", "aria-label": "练了多久" }),
+      timer: el("span", { class: "session-chip", "aria-label": tr("练了多久", "Practice time") }),
       levelName: el("span"),
       levelHint: el("span"),
       levelFill: el("span"),
       setHint: el("p", { class: "set-hint" }),
       video: el("video", { class: "live", playsinline: true, muted: true, autoplay: true }),
       canvas: el("canvas", { class: "live overlay", "aria-hidden": "true" }),
-      guidance: el("p", { class: "guidance", text: "小鸟正在热身…" }),
+      guidance: el("p", { class: "guidance", text: tr("小鸟正在热身…", "Chirpi is warming up…") }),
       score: el("span", { class: "score-value", text: "0" }),
       pop: el("span", { class: "pop", "aria-hidden": "true", text: "+1" }),
-      dots: el("div", { class: "dots", "aria-label": "这一组的进度" }),
+      dots: el("div", { class: "dots", "aria-label": tr("这一组的进度", "This set's progress") }),
       error: el("p", { class: "note error", hidden: true }),
       mute: el("button", { class: "control", type: "button", onclick: toggleMute }),
       flip: el("button", {
-        class: "control", type: "button", "aria-label": "换前后摄像头",
+        class: "control", type: "button", "aria-label": tr("换前后摄像头", "Switch camera"),
         onclick: async () => {
           view.flip.disabled = true;
           try {
@@ -477,7 +515,7 @@ const screens = {
       el("div", { class: "practice-bottom" }, [
         view.error,
         el("div", { class: "hud" }, [
-          el("div", { class: "score" }, [view.score, el("span", { class: "score-label", text: "杆" }), view.pop]),
+          el("div", { class: "score" }, [view.score, el("span", { class: "score-label", text: tr("杆", "swings") }), view.pop]),
           view.dots,
           view.setHint,
         ]),
@@ -493,18 +531,17 @@ const screens = {
   practice_summary() {
     const { swings, clips } = state.session;
     if (swings) {
-      say(`今天挥了 ${swings} 杆，太棒了！`, `拿到 ${swings} 分。`, "celebrate");
-      speak(DONE_LINE);
+      say(tr(`今天挥了 ${swings} 杆，太棒了！`, `${swings} swings today, amazing!`), tr(`拿到 ${swings} 分。`, `You earned ${swings} points.`), "celebrate");
     } else {
-      say("这次没有数到挥杆", "下次站到画面里，双脚和双手都要看得到。");
+      say(tr("这次没有数到挥杆", "No swings counted this time"), tr("下次站到画面里，双脚和双手都要看得到。", "Next time, stand in the frame with your feet and hands visible."));
     }
     return [
       levelCard(),
-      clips.length ? el("p", { class: "section-title", text: "这次的挥杆" }) : null,
+      clips.length ? el("p", { class: "section-title", text: tr("这次的挥杆", "This session's swings") }) : null,
       clips.length ? el("div", { class: "clips" }, clips.map(clipFigure)) : null,
-      clips.length ? el("p", { class: "note", text: "视频只留到关闭页面。想留着就点“保存”，再选“存储视频”，就会进相册。" }) : null,
+      clips.length ? el("p", { class: "note", text: tr("视频只留到关闭页面。想留着就点“保存”，再选“存储视频”，就会进相册。", "Videos only last until you close the page. To keep one, tap Save, then Save Video to put it in Photos.") }) : null,
       el("div", { class: "actions" }, [
-        el("button", { class: "primary", type: "button", text: "回主页", onclick: () => go("home") }),
+        el("button", { class: "primary", type: "button", text: tr("回主页", "Back to home"), onclick: () => go("home") }),
       ]),
     ];
   },
@@ -530,29 +567,29 @@ function updatePracticeView() {
     el("span", { class: index < inSet ? "dot on" : "dot" }),
   ));
   const left = FEEDBACK_EVERY - (swings % FEEDBACK_EVERY);
-  view.set.textContent = `第 ${Math.floor(swings / FEEDBACK_EVERY) + 1} 组`;
-  view.setHint.textContent = `再 ${left} 杆，它给你这组的话。`;
-  const { level, name, start, next } = levelOf(state.progress.points);
+  view.set.textContent = tr(`第 ${Math.floor(swings / FEEDBACK_EVERY) + 1} 组`, `Set ${Math.floor(swings / FEEDBACK_EVERY) + 1}`);
+  view.setHint.textContent = tr(`再 ${left} 杆，它给你这组的话。`, left === 1 ? "1 more swing until this set's tip." : `${left} more swings until this set's tip.`);
+  const { level, name, start, next } = levelOf(state.progress.points, LANG);
   view.levelName.textContent = `Lv.${level} ${name}`;
-  view.levelHint.textContent = next ? `再 ${next - state.progress.points} 杆升级` : "最高级了";
+  view.levelHint.textContent = next ? tr(`再 ${next - state.progress.points} 杆升级`, `${next - state.progress.points} to level up`) : tr("最高级了", "Top level");
   view.levelFill.style.width = `${next ? Math.round(((state.progress.points - start) / (next - start)) * 100) : 100}%`;
   view.mute.replaceChildren(icon(state.muted ? "muted" : "speaker"));
   view.mute.classList.toggle("off", state.muted);
-  view.mute.setAttribute("aria-label", state.muted ? "Chirpi 静音中，点一下打开" : "Chirpi 会说话，点一下静音");
+  view.mute.setAttribute("aria-label", state.muted ? tr("Chirpi 静音中，点一下打开", "Chirpi is muted, tap to unmute") : tr("Chirpi 会说话，点一下静音", "Chirpi can talk, tap to mute"));
   if (view.talk && realtimeChosen()) {
     const { status, micOpen } = state.live;
     view.talk.replaceChildren(icon("mic"));
     view.talk.classList.toggle("listening", status === "on" && micOpen);
     view.talk.classList.toggle("off", status === "on" && !micOpen);
     view.talk.disabled = status !== "on";
-    view.talk.setAttribute("aria-label", status === "connecting" ? "实时对话连接中" : status === "off" ? "实时对话已结束"
-      : micOpen ? "Chirpi 在听，点一下关麦克风" : "麦克风关着，点一下打开");
+    view.talk.setAttribute("aria-label", status === "connecting" ? tr("实时对话连接中", "Real-time chat connecting") : status === "off" ? tr("实时对话已结束", "Real-time chat ended")
+      : micOpen ? tr("Chirpi 在听，点一下关麦克风", "Chirpi is listening, tap to turn off the mic") : tr("麦克风关着，点一下打开", "Mic is off, tap to turn it on"));
   } else if (view.talk) {
     const { status } = state.talk;
     view.talk.replaceChildren(icon("mic"));
     view.talk.classList.toggle("listening", status === "listening");
     view.talk.disabled = status === "thinking";
-    view.talk.setAttribute("aria-label", status === "listening" ? "说完了" : "跟 Chirpi 说话");
+    view.talk.setAttribute("aria-label", status === "listening" ? tr("说完了", "Done talking") : tr("跟 Chirpi 说话", "Talk to Chirpi"));
   }
 }
 
@@ -577,7 +614,7 @@ function talkContext() {
     experience: labelOf(EXPERIENCE, profile.experience),
     goal: profile.goal,
     handedness: labelOf(HANDEDNESS, profile.handedness),
-    bird: kind ? `${kind.name}（${kind.tags.join("、")}）` : "",
+    bird: kind ? tr(`${kind.name}（${kind.tags.join("、")}）`, `${kind.name} (${kind.tags.join(", ")})`) : "",
     swings: state.session.swings,
     camera: labelOf(CAMERA_VIEWS, profile.camera_view),
     last_feedback: state.session.lastFeedback,
@@ -597,23 +634,23 @@ async function talkToChirpi() {
   stopVoice();
   if (window.speechSynthesis) speechSynthesis.cancel();
   feedbackUntil = Infinity; // swings meanwhile still count, but don't cover the conversation with cheers
-  say("我在听…", "说完停一下就好", "talk");
+  say(tr("我在听…", "Listening…"), tr("说完停一下就好", "Just pause when you're done"), "talk");
   setTalkStatus("listening");
   let text = "";
   try {
-    listening = listen({ onHeard: (heard) => say(`“${heard}”`, "我在听…", "talk") });
+    listening = listen({ onHeard: (heard) => say(`“${heard}”`, tr("我在听…", "Listening…"), "talk") });
     text = await listening.done;
   } catch (problem) {
     say(problem.message, "", "hop");
   }
   listening = null;
   if (!text) {
-    if (state.talk.status === "listening") say("没听到你说话", "再点一下麦克风试试。", "hop");
+    if (state.talk.status === "listening") say(tr("没听到你说话", "I didn't hear anything"), tr("再点一下麦克风试试。", "Tap the mic and try again."), "hop");
     setTalkStatus("idle");
     return;
   }
   setTalkStatus("thinking");
-  say(`“${text}”`, "Chirpi 在想…", "talk");
+  say(`“${text}”`, tr("Chirpi 在想…", "Chirpi is thinking…"), "talk");
   let reply = "";
   try {
     await askChirpi({
@@ -647,7 +684,7 @@ function voiceChoice() {
   if (!realtimeAvailable()) return [];
   if (realtimeChosen()) loadRealtime().catch(() => {}); // ready before the tap that starts
   return [
-    el("p", { class: "section-title", text: "Chirpi 怎么陪你" }),
+    el("p", { class: "section-title", text: tr("Chirpi 怎么陪你", "How Chirpi keeps you company") }),
     ...optionList(VOICE_MODES, state.profile.voice_mode, (value) => { state.profile.voice_mode = value; saveProfile(); render(); }),
   ];
 }
@@ -656,16 +693,18 @@ function voiceChoice() {
 function liveContext() {
   const context = talkContext();
   const facts = [
-    context.name && `名字：${context.name}`,
-    context.level && `水平：${context.level}`,
-    context.experience && `球龄：${context.experience}`,
-    context.goal && `目标：${context.goal}`,
-    context.handedness && `习惯：${context.handedness}`,
-    context.bird && `Chirpi 是：${context.bird}`,
-    context.camera && `手机：${context.camera}`,
+    context.name && tr(`名字：${context.name}`, `name: ${context.name}`),
+    context.level && tr(`水平：${context.level}`, `level: ${context.level}`),
+    context.experience && tr(`球龄：${context.experience}`, `playing for: ${context.experience}`),
+    context.goal && tr(`目标：${context.goal}`, `goal: ${context.goal}`),
+    context.handedness && tr(`习惯：${context.handedness}`, `swings: ${context.handedness}`),
+    context.bird && tr(`Chirpi 是：${context.bird}`, `Chirpi is: ${context.bird}`),
+    context.camera && tr(`手机：${context.camera}`, `phone: ${context.camera}`),
   ].filter(Boolean);
-  const analysis = state.profile.camera_view === "face_on" ? "" : "这个角度只数杆和录像，没有动作建议。";
-  return `练球刚开始，还没有挥杆。球手资料：${facts.join("；")}。${analysis}`;
+  const analysis = state.profile.camera_view === "face_on" ? ""
+    : tr("这个角度只数杆和录像，没有动作建议。", " From this angle the app only counts and records swings, with no technique tips.");
+  return tr(`练球刚开始，还没有挥杆。球手资料：${facts.join("；")}。${analysis}`,
+    `Practice just started, no swings yet. The golfer: ${facts.join("; ")}.${analysis}`);
 }
 
 function setLive(next) {
@@ -678,7 +717,9 @@ async function startLive() {
   const name = state.profile.name;
   try {
     const call = await startRealtime({
-      firstMessage: `${name ? `${name}，` : ""}我在旁边看着呢！准备好了就挥，想聊随时说。`,
+      language: LANG,
+      firstMessage: tr(`${name ? `${name}，` : ""}我在旁边看着呢！准备好了就挥，想聊随时说。`,
+        `${name ? `${name}, I'm` : "I'm"} watching! Swing whenever you're ready, and talk to me any time.`),
       context: liveContext(),
       onMessage: (who, text) => {
         if (!view) return;
@@ -687,14 +728,14 @@ async function startLive() {
         feedbackUntil = Date.now() + FEEDBACK_SECONDS * 1000; // keep its words up instead of the next cheer
       },
       onMode: (mode) => { if (mode === "speaking" && view) react("talk"); },
-      onEnd: () => liveEnded("实时对话到时间了", "接下来我用录好的声音陪你。"),
+      onEnd: () => liveEnded(tr("实时对话到时间了", "Real-time chat time's up"), tr("接下来我用录好的声音陪你。", "I'll keep you company with my recorded voice now.")),
     });
     if (state.live.status !== "connecting") { await call.end(); return; } // practice ended meanwhile
     if (state.muted) call.setMuted(true);
     setLive({ call, status: "on" });
   } catch (problem) {
     console.error(problem);
-    if (state.live.status === "connecting") liveEnded("实时对话没连上", "这次先用录好的声音陪你。");
+    if (state.live.status === "connecting") liveEnded(tr("实时对话没连上", "Real-time chat couldn't connect"), tr("这次先用录好的声音陪你。", "I'll use my recorded voice this time."));
   }
 }
 
@@ -734,19 +775,16 @@ const practiceHandlers = {
     state.session.swings = swing;
     const { call } = state.live;
     if (call) {
-      call.tell(`球手挥了第 ${swing} 杆。`);
-      if (levelUp) call.ask(`球手刚升到「${levelUp}」这一级，开心地恭喜一句。`);
+      call.tell(tr(`球手挥了第 ${swing} 杆。`, `The golfer just hit swing ${swing}.`));
     }
     if (levelUp) {
       const text = levelUpLine(levelUp);
-      say(text, "继续加油！", "celebrate");
-      speak(text);
+      say(text, tr("继续加油！", "Keep going!"), "celebrate");
     } else if (Date.now() < feedbackUntil) {
       react("cheer");
     } else {
       const cheer = CHEERS[(swing - 1) % CHEERS.length];
-      say(cheer, `第 ${swing} 杆 · +1 分`, "cheer");
-      speak(cheer, { important: false });
+      say(cheer, tr(`第 ${swing} 杆 · +1 分`, `Swing ${swing} · +1 point`), "cheer");
     }
     updatePracticeView();
     if (view) {
@@ -766,7 +804,8 @@ const practiceHandlers = {
     state.session.lastFeedback = text;
     say(text, "", "talk");
     const { call } = state.live;
-    if (call) call.ask(`球手挥完了第 ${state.session.swings} 杆。这一组的建议：${text}。用你的话跟球手说。`);
+    if (call) call.ask(tr(`球手挥完了第 ${state.session.swings} 杆。这一组的建议：${text}。用你的话跟球手说。`,
+      `The golfer just finished swing ${state.session.swings}. This set's tip: ${text} Tell the golfer in your own words.`));
     else if (state.talk.status === "idle") speak(spokenFeedback(text));
     feedbackUntil = Date.now() + FEEDBACK_SECONDS * 1000;
   },
@@ -778,7 +817,7 @@ async function startPractice() {
   state.session = { swings: 0, clips: [], error: "", lastFeedback: "", startedAt: Date.now() };
   unlockVoice();
   if (realtimeChosen()) startLive(); // in the tap, so the phone lets the call use the mic and speaker
-  else speak(START_LINE); // iPhones only allow speech after a tap; this tap unlocks the system voice too
+  else unlockSystemVoice();
   go("practice");
   practice = new Practice({
     video: view.video,
@@ -813,7 +852,7 @@ async function stopPractice() {
 const onboarding = createOnboarding({
   el, icon, state, go, say,
   setProgress: (fraction) => { progressFill.style.width = `${Math.round(fraction * 100)}%`; },
-  saveProfile, speakRecorded, unlockVoice,
+  saveProfile, unlockVoice,
   questions: CHAT_QUESTIONS,
   hatchLine: HATCH_LINE,
 });
@@ -828,6 +867,7 @@ function render() {
   progressBar.classList.toggle("hidden", state.step !== "chat");
   panel.replaceChildren(...screens[state.step]().filter(Boolean));
 }
+
 
 applyCap(state.profile.cap);
 render();

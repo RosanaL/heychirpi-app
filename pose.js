@@ -1,5 +1,7 @@
 // Camera and pose model. Everything runs on the phone; no frame leaves the device.
 
+import { tr } from "./i18n.js";
+
 const VISION_MODULE = new URL("./vendor/tasks-vision/vision_bundle.mjs", import.meta.url).href;
 const WASM_ROOT = new URL("./vendor/tasks-vision/wasm", import.meta.url).href;
 const MODEL_URL = new URL("./models/pose_landmarker_lite.task", import.meta.url).href;
@@ -50,7 +52,7 @@ export const backend = {
 
   openCamera(facing) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error("这个浏览器打不开摄像头，请用 iPhone 的 Safari 打开。");
+      throw new Error(tr("这个浏览器打不开摄像头，请用 iPhone 的 Safari 打开。", "This browser can't open the camera. Please use Safari on an iPhone."));
     }
     return navigator.mediaDevices.getUserMedia({
       audio: false,

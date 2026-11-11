@@ -483,15 +483,16 @@ export function analyzeSwing(recording) {
   return features === null ? null : assess(features);
 }
 
-// Points, levels and the short tip after each set of swings.
+// Points, levels and the short tip after each set of swings. Words come in Chinese (the default,
+// which core/ matches word for word) and English; the app passes its language.
 
 export const FEEDBACK_EVERY = 5;
 const LEVELS = [
-  [0, "刚破壳"],
-  [10, "雏鸟"],
-  [30, "小鸟"],
-  [60, "会飞了"],
-  [100, "老鹰"],
+  [0, "刚破壳", "Hatchling"],
+  [10, "雏鸟", "Chick"],
+  [30, "小鸟", "Birdie"],
+  [60, "会飞了", "Flyer"],
+  [100, "老鹰", "Eagle"],
 ];
 const FAULT_TEXT = {
   sway: ["髋部往后滑", "上杆时转髋，别让髋往后滑。"],
@@ -503,26 +504,42 @@ const FAULT_TEXT = {
   rushed_tempo: ["节奏有点急", "上杆慢一点，让下杆去发力。"],
   unstable_finish: ["收杆不太稳", "收杆后站稳，保持一秒。"],
 };
+const FAULT_TEXT_EN = {
+  sway: ["hips sliding back", "Turn your hips on the backswing instead of sliding them back."],
+  hanging_back: ["weight stuck on the back foot", "At the finish, get your weight onto your front foot, belt buckle facing the target."],
+  slide: ["hips sliding toward the target", "On the downswing, let your hips turn open instead of sliding forward."],
+  reverse_spine: ["upper body leaning toward the target at the top", "At the top, keep your upper body behind the ball, trail shoulder a little lower."],
+  head_sway: ["a lot of head movement", "Keep your head quiet and turn around your spine."],
+  standing_up: ["standing up through impact", "At impact, keep your chest over the ball and hold your posture."],
+  rushed_tempo: ["a rushed tempo", "Slow the backswing down and let the downswing do the work."],
+  unstable_finish: ["a wobbly finish", "Hold your finish, balanced, for one second."],
+};
 
 export const FAULT_CODES = Object.keys(FAULT_TEXT);
 export const LEVEL_NAMES = LEVELS.slice(1).map(([, name]) => name); // the levels you can reach
+export const LEVEL_NAMES_EN = LEVELS.slice(1).map(([, , name]) => name);
 
-export function levelOf(points) {
+export function levelOf(points, lang = "zh") {
   let index = 0;
   LEVELS.forEach(([needed], candidate) => { if (points >= needed) index = candidate; });
   return {
     level: index + 1,
-    name: LEVELS[index][1],
+    name: LEVELS[index][lang === "en" ? 2 : 1],
     start: LEVELS[index][0],
     next: index + 1 < LEVELS.length ? LEVELS[index + 1][0] : null,
   };
 }
 
-export function setFeedback(reports, setNumber, { analyzed = true } = {}) {
-  const opening = `第 ${setNumber} 组 ${reports.length} 杆完成！`;
-  if (!analyzed) return `${opening}从后面我看不到身体动作，回看一下视频里的球路吧。`;
+export function setFeedback(reports, setNumber, { analyzed = true, lang = "zh" } = {}) {
+  const en = lang === "en";
+  const opening = en ? `Set ${setNumber}: ${reports.length} swings done! ` : `第 ${setNumber} 组 ${reports.length} 杆完成！`;
+  if (!analyzed) {
+    return opening + (en ? "From behind I can't see your body, so check the ball flight in your videos." : "从后面我看不到身体动作，回看一下视频里的球路吧。");
+  }
   const measured = reports.filter((report) => report !== null);
-  if (measured.length * 2 < reports.length) return `${opening}有几杆我没看清全身，下一组让双脚和双手都留在画面里。`;
+  if (measured.length * 2 < reports.length) {
+    return opening + (en ? "I couldn't see all of you on a few swings. Next set, keep your feet and hands in the frame." : "有几杆我没看清全身，下一组让双脚和双手都留在画面里。");
+  }
   const counts = new Map();
   for (const report of measured) {
     if (report.primary) counts.set(report.primary.code, (counts.get(report.primary.code) || 0) + 1);
@@ -533,18 +550,28 @@ export function setFeedback(reports, setNumber, { analyzed = true } = {}) {
     if (seen > count) [code, count] = [candidate, seen];
   }
   if (count >= 2 && FAULT_TEXT[code]) {
+    if (en) {
+      const [title, cue] = FAULT_TEXT_EN[code];
+      return `${opening}${count} swings had ${title}. Next set, try this: ${cue}`;
+    }
     const [title, cue] = FAULT_TEXT[code];
     return `${opening}这组有 ${count} 杆${title}。下一组试试：${cue}`;
   }
-  return `${opening}这组很稳，没有反复出现的问题，保持住！`;
+  return opening + (en ? "Solid set, nothing kept coming back. Keep it up!" : "这组很稳，没有反复出现的问题，保持住！");
 }
 
-export function guidance(pipeline) {
-  if (!pipeline.tracking) return "站到画面里，双脚和双手都要看得到";
+const GUIDANCE = {
+  zh: { away: "站到画面里，双脚和双手都要看得到", back: "上杆…", down: "下杆！", finish: "收杆，站稳", reset: "放下球杆，准备下一杆", ready: "准备好了，挥吧！", setup: "摆好准备姿势，停一下" },
+  en: { away: "Step into the frame, feet and hands visible", back: "Backswing…", down: "Down!", finish: "Finish and hold", reset: "Club down, set up for the next one", ready: "Ready, swing away!", setup: "Take your setup and hold still" },
+};
+
+export function guidance(pipeline, lang = "zh") {
+  const words = GUIDANCE[lang] || GUIDANCE.zh;
+  if (!pipeline.tracking) return words.away;
   const { phase } = pipeline;
-  if (phase === BACKSWING) return "上杆…";
-  if (phase === DOWNSWING) return "下杆！";
-  if (phase === FOLLOW_THROUGH) return "收杆，站稳";
-  if (phase === WAITING_FOR_ADDRESS) return "放下球杆，准备下一杆";
-  return pipeline.addressReady ? "准备好了，挥吧！" : "摆好准备姿势，停一下";
+  if (phase === BACKSWING) return words.back;
+  if (phase === DOWNSWING) return words.down;
+  if (phase === FOLLOW_THROUGH) return words.finish;
+  if (phase === WAITING_FOR_ADDRESS) return words.reset;
+  return pipeline.addressReady ? words.ready : words.setup;
 }

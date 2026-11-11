@@ -5,6 +5,7 @@ import { backend, drawPose, toFrame } from "./pose.js";
 import {
   analyzeSwing, FEEDBACK_EVERY, guidance, setFeedback, SwingPipeline, WAITING_FOR_BACKSWING,
 } from "./swing.js";
+import { LANG, tr } from "./i18n.js";
 
 const MAX_IDLE_SEGMENT_SECONDS = 8; // start a fresh video while waiting, so saved clips don't begin with a long wait
 const VIDEO_BITS_PER_SECOND = 2_000_000;
@@ -64,7 +65,7 @@ export class Practice {
   }
 
   async start() {
-    this.handlers.onGuidance("小鸟正在热身，第一次要下载约 20 MB…");
+    this.handlers.onGuidance(tr("小鸟正在热身，第一次要下载约 20 MB…", "Chirpi is warming up. The first time downloads about 20 MB…"));
     await backend.load();
     await this.openCamera();
     this.running = true;
@@ -75,7 +76,7 @@ export class Practice {
   }
 
   async openCamera() {
-    this.handlers.onGuidance("正在打开摄像头…");
+    this.handlers.onGuidance(tr("正在打开摄像头…", "Opening the camera…"));
     this.stream = await backend.openCamera(this.facing);
     this.video.srcObject = this.stream;
     this.video.classList.toggle("mirror", this.facing === "user");
@@ -149,14 +150,14 @@ export class Practice {
         drawPose(this.canvas, result);
         const recording = this.pipeline.push(toFrame(result, width, height, now()));
         if (recording) this.onSwing(recording);
-        this.handlers.onGuidance(guidance(this.pipeline));
+        this.handlers.onGuidance(guidance(this.pipeline, LANG));
         this.clips.dropIfLong(this.pipeline.phase === WAITING_FOR_BACKSWING);
       }
       this.scheduleFrame();
     } catch (problem) {
       console.error(problem);
       this.running = false;
-      this.handlers.onError("摄像头或识别出错了，点“练完了”再重新开始一次。");
+      this.handlers.onError(tr("摄像头或识别出错了，点“练完了”再重新开始一次。", "Something went wrong with the camera or tracking. Tap Done and start again."));
     }
   }
 
@@ -177,7 +178,7 @@ export class Practice {
     });
 
     if (swing % FEEDBACK_EVERY === 0) {
-      const text = setFeedback(this.reports.slice(-FEEDBACK_EVERY), swing / FEEDBACK_EVERY, { analyzed: this.analyze });
+      const text = setFeedback(this.reports.slice(-FEEDBACK_EVERY), swing / FEEDBACK_EVERY, { analyzed: this.analyze, lang: LANG });
       this.handlers.onFeedback(text);
     }
   }

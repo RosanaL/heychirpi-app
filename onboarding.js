@@ -1,13 +1,21 @@
 // First visit: a golf ball on the night range is about to hatch into a birdie.
 // The golfer chats with it, sees what kind of bird it will be, picks a cap and holds to hatch it.
 
-const STORY = [
+import { tr } from "./i18n.js";
+
+const STORY = tr([
   "夜场快关灯了。",
   "听说，每颗球都想打出一个小鸟球。",
   "这颗……好像是认真的。",
   "喂！外面有人吗？",
   "我快孵出来了，可还不知道要变成什么样的小鸟。你能陪我聊两句吗？",
-];
+], [
+  "The night range is about to close.",
+  "They say every golf ball dreams of making a birdie.",
+  "This one… seems to mean it.",
+  "Hey! Is anyone out there?",
+  "I'm about to hatch, but I don't know what kind of bird I'll be yet. Will you chat with me for a bit?",
+]);
 const STORY_SECONDS = 2.8;
 const TYPING_SECONDS = 0.8;
 const HOLD_SECONDS = 1.8;
@@ -15,21 +23,29 @@ const FLASH_SECONDS = 0.45;
 const SHARE_URL = () => `${location.origin}${location.pathname}`;
 
 export const CAPS = [
-  { value: "green", label: "果岭绿", top: "#3aa86f", brim: "#2d8a5a" },
-  { value: "red", label: "球旗红", top: "#e2574c", brim: "#b83f36" },
-  { value: "blue", label: "夜空蓝", top: "#4f8fe0", brim: "#3a6fb8" },
-  { value: "pink", label: "樱花粉", top: "#f58fb0", brim: "#d96f92" },
+  { value: "green", label: tr("果岭绿", "Fairway Green"), top: "#3aa86f", brim: "#2d8a5a" },
+  { value: "red", label: tr("球旗红", "Flag Red"), top: "#e2574c", brim: "#b83f36" },
+  { value: "blue", label: tr("夜空蓝", "Night Blue"), top: "#4f8fe0", brim: "#3a6fb8" },
+  { value: "pink", label: tr("樱花粉", "Blossom Pink"), top: "#f58fb0", brim: "#d96f92" },
 ];
 
-const KINDS = {
+const KINDS = tr({
   far: { name: "冲天鸟", about: "陪你把球送到更远的地方，每一杆我都飞在前面等它。", tags: ["爱冲", "嗓门大", "不怕挑战"] },
   steady: { name: "稳稳鸟", about: "不催你，不吓你，陪你把同一个动作练到不用想。", tags: ["耐心", "靠谱", "细心"] },
   record: { name: "破纪录鸟", about: "心里记着你的那个数字，你每练一杆，我都替你记一笔。", tags: ["好胜", "记性好", "爱庆祝"] },
   happy: { name: "开心鸟", about: "打好打坏都是好天气。练球这件事，开心最要紧。", tags: ["爱笑", "话多", "不记仇"] },
   buddy: { name: "搭子鸟", about: "你说的目标我记下了。从今天起，你练球，我就在旁边。", tags: ["仗义", "好奇", "爱凑热闹"] },
-};
+}, {
+  far: { name: "Skyrocket Bird", about: "I'll help you send the ball farther, and fly out ahead to wait for every shot.", tags: ["Bold", "Loud", "Loves a challenge"] },
+  steady: { name: "Steady Bird", about: "No rushing, no scaring. I'll stay with you until the same move needs no thinking.", tags: ["Patient", "Reliable", "Careful"] },
+  record: { name: "Record Bird", about: "I keep your number in mind, and I count every swing you put in toward it.", tags: ["Competitive", "Great memory", "Loves to celebrate"] },
+  happy: { name: "Happy Bird", about: "Good shot or bad, it's always a nice day. When you practice, having fun comes first.", tags: ["Smiley", "Chatty", "Never holds a grudge"] },
+  buddy: { name: "Buddy Bird", about: "I wrote down your goal. From today on, whenever you practice, I'm right beside you.", tags: ["Loyal", "Curious", "Loves company"] },
+});
+// Goals from the suggestions in either language; anything else is a buddy.
 const KIND_OF_GOAL = {
   打得更远: "far", 打得更稳定: "steady", 改掉右曲球: "steady", "第一次破 100": "record", "破 90": "record", 享受打球就好: "happy",
+  "Hit it farther": "far", "Be more consistent": "steady", "Fix my slice": "steady", "Break 100": "record", "Break 90": "record", "Just enjoy the game": "happy",
 };
 
 // The kind follows the goal until the bird hatches, then it is kept even if the goal changes.
@@ -71,7 +87,7 @@ function ballMarkup({ cap = false, cracks = false } = {}) {
   </svg>`;
 }
 
-export function createOnboarding({ el, icon, state, go, say, setProgress, saveProfile, speakRecorded, unlockVoice, questions, hatchLine }) {
+export function createOnboarding({ el, icon, state, go, say, setProgress, saveProfile, unlockVoice, questions, hatchLine }) {
   let timers = [];
   let stopHold = null;
 
@@ -93,10 +109,10 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
   };
   const nameOf = () => (state.profile.name || "").trim();
   const roundNext = (onclick, disabled = false) => el("button", {
-    class: "fab", type: "button", "aria-label": "下一步", disabled, onclick,
+    class: "fab", type: "button", "aria-label": tr("下一步", "Next"), disabled, onclick,
   }, [icon("next")]);
   const roundBack = (step) => el("button", {
-    class: "back", type: "button", "aria-label": "上一步", onclick: () => go(step),
+    class: "back", type: "button", "aria-label": tr("上一步", "Back"), onclick: () => go(step),
   }, [icon("back")]);
 
   // --- The chat. What has already been said is worked out from the answers, so going back just works. ---
@@ -139,7 +155,7 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
     };
     const typing = () => add(el("div", { class: "message ball typing" }, [
       el("span", { class: "message-ball", "aria-hidden": "true" }),
-      el("p", { class: "message-text", "aria-label": "正在输入" }, [el("i"), el("i"), el("i")]),
+      el("p", { class: "message-text", "aria-label": tr("正在输入", "Typing") }, [el("i"), el("i"), el("i")]),
     ]));
     const sayFromBall = (text) => add(message("ball", text, { latest: true }));
 
@@ -156,7 +172,7 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       updateProgress();
       if (index() >= questions.length) {
         answers.replaceChildren(el("div", { class: "actions" }, [
-          el("button", { class: "primary", type: "button", text: "继续", onclick: () => go("match") }),
+          el("button", { class: "primary", type: "button", text: tr("继续", "Continue"), onclick: () => go("match") }),
         ]));
         scrollDown();
         return;
@@ -175,7 +191,7 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       later(() => {
         sayFromBall(replyText(question));
         if (state.chatIndex >= questions.length) {
-          sayFromBall("够了够了，我感觉到了……");
+          sayFromBall(tr("够了够了，我感觉到了……", "That's enough, I can feel it…"));
           askNext();
           return;
         }
@@ -202,7 +218,7 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       field.value = state.profile[question.key] || "";
       field.addEventListener("keydown", (key) => { if (key.key === "Enter") send(); });
       const sendButton = el("button", {
-        class: "send", type: "button", "aria-label": "发送", disabled: !field.value.trim(), onclick: send,
+        class: "send", type: "button", "aria-label": tr("发送", "Send"), disabled: !field.value.trim(), onclick: send,
       }, [icon("next")]);
       return [
         el("div", { class: "chips" }, question.ideas.map((idea) => el("button", {
@@ -219,7 +235,7 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
     }
 
     const back = el("button", {
-      class: "back", type: "button", "aria-label": "上一步",
+      class: "back", type: "button", "aria-label": tr("上一步", "Back"),
       onclick: () => {
         if (index() === 0) { go("name"); return; }
         state.chatIndex -= 1;
@@ -228,7 +244,7 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
     }, [icon("back")]);
 
     if (index() >= questions.length) {
-      sayFromBall("够了够了，我感觉到了……");
+      sayFromBall(tr("够了够了，我感觉到了……", "That's enough, I can feel it…"));
       askNext();
     } else {
       updateProgress();
@@ -242,9 +258,9 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
   // --- Hold to hatch ---
 
   function hatchScreen() {
-    const egg = el("button", { class: "hatch-ball", type: "button", "aria-label": "按住孵化小鸟" });
+    const egg = el("button", { class: "hatch-ball", type: "button", "aria-label": tr("按住孵化小鸟", "Press and hold to hatch") });
     egg.innerHTML = ballMarkup({ cap: true, cracks: true });
-    const prompt = el("p", { class: "hatch-prompt" }, [el("span", { class: "key", text: "按住" }), " 把它孵出来"]);
+    const prompt = el("p", { class: "hatch-prompt" }, tr([el("span", { class: "key", text: "按住" }), " 把它孵出来"], [el("span", { class: "key", text: "Hold" }), " to hatch it"]));
     const flash = el("div", { class: "flash", "aria-hidden": "true" });
 
     const body = egg.querySelector(".ball-body");
@@ -313,11 +329,11 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       const caption = el("p", { class: "caption", "aria-live": "polite", text: STORY[0] });
       const stage = ball({}, "dim");
       const button = el("button", {
-        class: "primary", type: "button", text: "好呀",
+        class: "primary", type: "button", text: tr("好呀", "Sure!"),
         onclick: (click) => { click.stopPropagation(); unlockVoice(); go("name"); },
       });
       const actions = el("div", { class: "actions story-actions", hidden: true }, [button]);
-      const hint = el("p", { class: "story-hint", text: "点一下继续" });
+      const hint = el("p", { class: "story-hint", text: tr("点一下继续", "Tap to continue") });
 
       const advance = () => {
         if (shown >= STORY.length - 1) return;
@@ -352,7 +368,7 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       };
       const field = el("input", {
         class: "name-field", type: "text", maxlength: "20", enterkeyhint: "next", autocomplete: "given-name",
-        placeholder: "你的名字", "aria-label": "你的名字",
+        placeholder: tr("你的名字", "Your name"), "aria-label": tr("你的名字", "Your name"),
         oninput: () => { state.profile.name = field.value; next.disabled = !field.value.trim(); },
       });
       field.value = state.profile.name || "";
@@ -361,9 +377,9 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       return [
         editing ? roundBack("summary") : null,
         el("div", { class: "ask" }, [
-          el("h1", { class: "ask-title", text: editing ? "想让我叫你什么？" : "先告诉我，你叫什么？" }),
+          el("h1", { class: "ask-title", text: editing ? tr("想让我叫你什么？", "What should I call you?") : tr("先告诉我，你叫什么？", "First, what's your name?") }),
           field,
-          el("p", { class: "note", text: "早期测试版。摄像头画面、视频和资料都只留在你的手机上，不会上传。" }),
+          el("p", { class: "note", text: tr("早期测试版。摄像头画面、视频和资料都只留在你的手机上，不会上传。", "Early beta. Your camera feed, videos and answers stay on your phone and are never uploaded.") }),
           next,
         ]),
       ];
@@ -376,10 +392,10 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       return [
         roundBack("chat"),
         el("div", { class: "scene match" }, [
-          el("h1", { class: "ask-title", text: "我知道我要变成什么了！" }),
+          el("h1", { class: "ask-title", text: tr("我知道我要变成什么了！", "I know what I'm going to be!") }),
           ball({}, "glow small"),
           el("div", { class: "match-card" }, [
-            el("span", { class: "match-label", text: `${nameOf()}，你的小鸟是` }),
+            el("span", { class: "match-label", text: tr(`${nameOf()}，你的小鸟是`, `${nameOf()}, your bird is a`) }),
             el("strong", { class: "match-name", text: kind.name }),
             el("p", { text: kind.about }),
             el("div", { class: "tags" }, kind.tags.map((tag) => el("span", { class: "tag", text: tag }))),
@@ -412,12 +428,12 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       return [
         roundBack(editing ? "summary" : "match"),
         el("div", { class: "scene caps" }, [
-          el("h1", { class: "ask-title", text: "给我挑顶帽子吧" }),
-          el("p", { class: "ask-sub", text: "以后随时可以换。" }),
+          el("h1", { class: "ask-title", text: tr("给我挑顶帽子吧", "Pick a cap for me") }),
+          el("p", { class: "ask-sub", text: tr("以后随时可以换。", "You can change it any time.") }),
           el("div", { class: "cap-row" }, [
-            arrow("back", -1, "上一顶"),
+            arrow("back", -1, tr("上一顶", "Previous cap")),
             ball({ cap: true }, "small"),
-            arrow("next", 1, "下一顶"),
+            arrow("next", 1, tr("下一顶", "Next cap")),
           ]),
           label,
           swatches,
@@ -436,7 +452,6 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       }
       saveProfile();
       say("Chirpi", "", "celebrate");
-      speakRecorded(hatchLine);
       return [
         el("p", { class: "caption in", text: hatchLine }),
         roundNext(() => go("card")),
@@ -450,17 +465,17 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
       picture.classList.remove("hop", "cheer", "celebrate", "talk");
       const status = el("p", { class: "note", "aria-live": "polite" });
       const share = el("button", {
-        class: "share", type: "button", text: "发给朋友",
+        class: "share", type: "button", text: tr("发给朋友", "Send to a friend"),
         onclick: async () => {
-          const text = `${nameOf()}孵出了一只${kind.name}，来练球场找它玩。`;
+          const text = tr(`${nameOf()}孵出了一只${kind.name}，来练球场找它玩。`, `${nameOf()} hatched a ${kind.name}. Come say hi at the range.`);
           try {
             if (navigator.share) await navigator.share({ title: "Chirpi", text, url: SHARE_URL() });
             else {
               await navigator.clipboard.writeText(`${text} ${SHARE_URL()}`);
-              status.textContent = "链接已复制";
+              status.textContent = tr("链接已复制", "Link copied");
             }
           } catch (problem) {
-            if (problem.name !== "AbortError") status.textContent = "没发出去，再试一次吧";
+            if (problem.name !== "AbortError") status.textContent = tr("没发出去，再试一次吧", "Didn't send. Try again?");
           }
         },
       });
@@ -470,16 +485,16 @@ export function createOnboarding({ el, icon, state, go, say, setProgress, savePr
             el("div", { class: "bird-card-sky" }, [picture]),
             el("div", { class: "bird-card-body" }, [
               el("strong", { class: "bird-card-name", text: "Chirpi" }),
-              el("p", { text: `${nameOf()} 的${kind.name}。${kind.about}` }),
+              el("p", { text: tr(`${nameOf()} 的${kind.name}。${kind.about}`, `${nameOf()}'s ${kind.name}. ${kind.about}`) }),
               el("div", { class: "tags" }, kind.tags.map((tag) => el("span", { class: "tag", text: tag }))),
             ]),
           ]),
           share,
           status,
           el("div", { class: "actions" }, [
-            el("button", { class: "primary", type: "button", text: "开始第一次练球", onclick: () => go("camera") }),
+            el("button", { class: "primary", type: "button", text: tr("开始第一次练球", "Start my first practice"), onclick: () => go("camera") }),
           ]),
-          el("button", { class: "link quiet-link", type: "button", text: "先去主页看看", onclick: () => go("home") }),
+          el("button", { class: "link quiet-link", type: "button", text: tr("先去主页看看", "Look around first"), onclick: () => go("home") }),
         ]),
       ];
     },

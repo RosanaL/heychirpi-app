@@ -2,6 +2,8 @@
 // answers sentence by sentence in Chirpi's voice. The server address and invite code arrive
 // once in the link's #fragment (never sent to any server) and are kept on this phone.
 
+import { tr } from "./i18n.js";
+
 const SETTINGS_KEY = "chirpi.talk";
 const LISTEN_SECONDS = 12;
 
@@ -38,7 +40,7 @@ export function canListen() {
 export function listen({ onHeard } = {}) {
   const Speech = Recognition();
   const recognition = new Speech();
-  recognition.lang = "zh-CN";
+  recognition.lang = tr("zh-CN", "en-US");
   recognition.interimResults = true;
   recognition.continuous = false;
   recognition.maxAlternatives = 1;
@@ -52,8 +54,8 @@ export function listen({ onHeard } = {}) {
     recognition.onerror = (event) => {
       if (event.error === "no-speech" || event.error === "aborted") return;
       const words = event.error === "not-allowed" || event.error === "service-not-allowed"
-        ? "没有麦克风权限。在 设置 › Safari › 麦克风 里允许这个网站。"
-        : "没听清，再说一次？";
+        ? tr("没有麦克风权限。在 设置 › Safari › 麦克风 里允许这个网站。", "No microphone permission. Allow this site in Settings › Safari › Microphone.")
+        : tr("没听清，再说一次？", "I didn't catch that. Say it again?");
       reject(new Error(words));
     };
     recognition.onend = () => { clearTimeout(timer); resolve(heard.trim()); };
@@ -74,10 +76,10 @@ export async function askChirpi({ settings, text, history, context, onLine }) {
       body: JSON.stringify({ text, history, context }),
     });
   } catch {
-    throw new Error("连不上 Chirpi，检查一下网络再试试。");
+    throw new Error(tr("连不上 Chirpi，检查一下网络再试试。", "Can't reach Chirpi. Check your connection and try again."));
   }
   if (!response.ok) {
-    let message = "Chirpi 这边出了点问题，过一会儿再试试。";
+    let message = tr("Chirpi 这边出了点问题，过一会儿再试试。", "Something went wrong on Chirpi's side. Try again in a bit.");
     try { message = (await response.json()).error || message; } catch { /* not JSON */ }
     throw new Error(message);
   }

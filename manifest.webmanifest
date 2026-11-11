@@ -1,7 +1,7 @@
 {
   "name": "Chirpi",
   "short_name": "Chirpi",
-  "description": "陪你练高尔夫的小鸟",
+  "description": "A little bird that keeps you company at the driving range",
   "lang": "zh-CN",
   "start_url": "./",
   "scope": "./",
